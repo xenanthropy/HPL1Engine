@@ -23,6 +23,7 @@
 #include "Newton.h"
 #include "NewtonUtils.h"
 #include "newtonWorld.h"
+#include "NewtonHPL1Joints.h"
 
 class NewtonSlider: public ndJointSlider
 {
@@ -40,20 +41,24 @@ class NewtonSlider: public ndJointSlider
 
 	void JacobianDerivative(ndConstraintDescritor& desc) override
 	{
+		// HPL1Engine: base rows first, then the row the 1.53 callback asks
+		// for (it used to be called but its result ignored; see
+		// NewtonHPL1Joints.h). The joint's angle/position and speed are
+		// refreshed first so the callback sees the current values, as 1.53's
+		// did.
 		m_desc = ndWeakPtr<ndConstraintDescritor>(&desc);
+		ndJointSlider::JacobianDerivative(desc);
 		if (m_callback)
 		{
+			UpdateParameters();
 			NewtonHingeSliderUpdateDesc userDesc;
-			unsigned state = 0;
-			userDesc.m_accel = 0.0f;
-			userDesc.m_timestep = desc.m_timestep;
-			userDesc.m_minFriction = -1.0e-20f;
-			userDesc.m_maxFriction = 1.0e-20f;
+			HPL1InitCallbackDesc(userDesc, desc);
 			NewtonJoint* const joint = PointerCast<NewtonJoint, NewtonSlider>(this);
-			m_callback(joint, &userDesc);
+			if (m_callback(joint, &userDesc))
+			{
+				HPL1SubmitCallbackRow(this, desc, userDesc, false);
+			}
 		}
-
-		ndJointSlider::JacobianDerivative(desc);
 	}
 
 	ndWeakPtr<ndConstraintDescritor> m_desc;

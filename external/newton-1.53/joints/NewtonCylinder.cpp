@@ -23,6 +23,7 @@
 #include "Newton.h"
 #include "NewtonUtils.h"
 #include "newtonWorld.h"
+#include "NewtonHPL1Joints.h"
 
 class NewtonCylinder: public ndJointCylinder
 {
@@ -40,25 +41,29 @@ class NewtonCylinder: public ndJointCylinder
 
 	void JacobianDerivative(ndConstraintDescritor& desc) override
 	{
+		// HPL1Engine: base rows first, then the rows the 1.53 callback asks
+		// for: bit 0 of its return value = translation row (userDesc[0]),
+		// bit 1 = rotation row (userDesc[1]), as in 1.53/2.36. The result used
+		// to be ignored; see NewtonHPL1Joints.h.
 		m_desc = ndWeakPtr<ndConstraintDescritor>(&desc);
+		ndJointCylinder::JacobianDerivative(desc);
 		if (m_callback)
 		{
+			UpdateParameters();
 			NewtonHingeSliderUpdateDesc userDesc[2];
-			unsigned state = 0;
-			userDesc[0].m_accel = 0.0f;
-			userDesc[0].m_timestep = desc.m_timestep;
-			userDesc[0].m_minFriction = -1.0e-20f;
-			userDesc[0].m_maxFriction = 1.0e-20f;
-			userDesc[1].m_accel = 0.0f;
-			userDesc[1].m_timestep = desc.m_timestep;
-			userDesc[1].m_minFriction = -1.0e-20f;
-			userDesc[1].m_maxFriction = 1.0e-20f;
-
+			HPL1InitCallbackDesc(userDesc[0], desc);
+			HPL1InitCallbackDesc(userDesc[1], desc);
 			NewtonJoint* const joint = PointerCast<NewtonJoint, NewtonCylinder>(this);
-			m_callback(joint, userDesc);
+			const unsigned code = m_callback(joint, userDesc);
+			if (code & 1)
+			{
+				HPL1SubmitCallbackRow(this, desc, userDesc[0], false);
+			}
+			if (code & 2)
+			{
+				HPL1SubmitCallbackRow(this, desc, userDesc[1], true);
+			}
 		}
-
-		ndJointCylinder::JacobianDerivative(desc);
 	}
 
 	ndWeakPtr<ndConstraintDescritor> m_desc;

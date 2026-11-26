@@ -67,3 +67,12 @@ behaviour, to keep the game's physics feel.
    - `NewtonBodySet/GetContinuousCollisionMode`: the flag is stored on the
      body and reported back (no simulation effect, as in 1.53).
 
+6. Joint limit callbacks (Phase 5, step 6): the hinge, slider and corkscrew
+   wrappers called HPL1's callback but ignored what it returned, so no door,
+   lever, drawer or screw limit had any effect. Now, as in 1.53/2.36, a
+   non-zero return adds one row along the pin after the base rows (angular
+   for the hinge, linear for the slider; corkscrew bit 0 = linear row from
+   `desc[0]`, bit 1 = angular row from `desc[1]`), with the callback's
+   acceleration and its min/max force as bounds. The defaults are
+   unbounded (were ±1e-20). The joint's angle/position are refreshed before
+   the callback. Helpers in `joints/NewtonHPL1Joints.h`.
