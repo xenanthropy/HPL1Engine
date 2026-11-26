@@ -161,6 +161,25 @@ namespace hpl {
 	bool cLowLevelGraphicsSDL::Init(int alWidth, int alHeight, int alBpp, int abFullscreen,
 									int alMultisampling, const tString& asWindowCaption)
 	{
+		// HPL1Engine: a width or height of 0 or less (the retail Linux port
+		// saves -1) means "use the desktop resolution". SDL_SetVideoMode
+		// rejects it, which used to drop the game to the 640x480 fallback.
+		if(alWidth <= 0 || alHeight <= 0)
+		{
+			const SDL_VideoInfo *pInfo = SDL_GetVideoInfo();
+			if(pInfo && pInfo->current_w > 0 && pInfo->current_h > 0)
+			{
+				alWidth = pInfo->current_w;
+				alHeight = pInfo->current_h;
+			}
+			else
+			{
+				alWidth = 800;
+				alHeight = 600;
+			}
+			Log(" Using desktop resolution %d x %d\n", alWidth, alHeight);
+		}
+
 		mvScreenSize.x = alWidth;
 		mvScreenSize.y = alHeight;
 		mlBpp = alBpp;
