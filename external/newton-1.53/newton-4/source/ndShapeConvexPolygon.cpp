@@ -547,6 +547,43 @@ ndInt32 ndShapeConvexPolygon::CalculateContactToConvexHullDescrete(ndContactSolv
 		return 0;
 	}
 
+	// HPL1Engine: Newton 2.x (and, we assume, 1.53) treats a mesh face as a
+	// thin plate and pushes a penetrating body out along the shortest way off
+	// it (EPA). When the shortest way is sideways, across one of the face's
+	// edges, rather than along the face normal, it makes no contact with that
+	// face. Newton 4
+	// always pushes out along the face normal, so a body that starts partly
+	// buried in level geometry (the boat lamp's rod hook in its ceiling
+	// beam) got shoved hard to one side. Do as 2.x: skip the face when the
+	// body could leave it sideways in less than its depth along the normal.
+	// Resting contacts are only a few mm deep, so they keep their face
+	// unless the body overhangs the face's edge by less than that.
+	{
+		const ndFloat32 depth = m_normal.DotProduct(m_localPoly[0] - p0).GetScalar();
+		if (depth > ndFloat32(0.0f))
+		{
+			const ndInt32 count = m_localPoly.GetCount();
+			ndInt32 j0 = count - 1;
+			for (ndInt32 j = 0; j < count; ++j)
+			{
+				const ndVector edge(m_localPoly[j] - m_localPoly[j0]);
+				ndVector inward(m_normal.CrossProduct(edge) & ndVector::m_triplexMask);
+				const ndFloat32 mag2 = inward.DotProduct(inward).GetScalar();
+				if (mag2 > ndFloat32(1.0e-12f))
+				{
+					inward = inward.Scale(ndFloat32(1.0f) / ndSqrt(mag2));
+					const ndVector support(hullMatrix.TransformVector(hull->SupportVertex(hullMatrix.UnrotateVector(inward))));
+					const ndFloat32 sideways = inward.DotProduct(support - m_localPoly[j0]).GetScalar();
+					if (sideways < depth)
+					{
+						return 0;
+					}
+				}
+				j0 = j;
+			}
+		}
+	}
+
 	ndVector boxSize;
 	ndVector boxOrigin;
 	hull->CalculateObb(boxOrigin, boxSize);

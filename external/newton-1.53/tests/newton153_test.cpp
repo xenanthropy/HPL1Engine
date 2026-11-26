@@ -654,6 +654,101 @@ static void TestSafety()
 	NewtonDestroy(w);
 }
 
+//-----------------------------------------------------------------------------
+// 10. Level meshes (tree collision), as 1.53/2.x: bodies rest, stack and
+//     slide on a floor made of many faces, and a body that starts partly
+//     buried in level geometry is not shoved sideways (the boat lamp's rod,
+//     whose hook sits inside its ceiling beam).
+//-----------------------------------------------------------------------------
+
+// Adds a quad (corners in order, front side by the right-hand rule) as two
+// triangles, as HPL1 feeds level meshes to Newton.
+static void AddQuad(NewtonCollision* tree, const float* a, const float* b, const float* c, const float* d)
+{
+	float t0[9] = {a[0],a[1],a[2], b[0],b[1],b[2], c[0],c[1],c[2]};
+	float t1[9] = {a[0],a[1],a[2], c[0],c[1],c[2], d[0],d[1],d[2]};
+	NewtonTreeCollisionAddFace(tree, 3, t0, 3*sizeof(float), 0);
+	NewtonTreeCollisionAddFace(tree, 3, t1, 3*sizeof(float), 0);
+}
+
+static NewtonBody* LevelBody(NewtonWorld* w, NewtonCollision* tree)
+{
+	NewtonBody* b = NewtonCreateBody(w, tree);
+	NewtonBodySetMatrix(b, kIdentity);
+	NewtonReleaseCollision(w, tree);
+	return b;
+}
+
+// A floor at y = 0 from -4 to 4 in x and z, in 1 m tiles, plus a box beam
+// (from y = 2.365 to 2.475, z from -0.0223 to 0.0523) like the boat's.
+static void BuildLevel(NewtonWorld* w)
+{
+	NewtonCollision* tree = NewtonCreateTreeCollision(w, NULL);
+	NewtonTreeCollisionBeginBuild(tree);
+	for (int x = -4; x < 4; x++)
+		for (int z = -4; z < 4; z++)
+		{
+			float a[3] = {(float)x, 0, (float)z}, b[3] = {(float)x, 0, (float)z + 1};
+			float c[3] = {(float)x + 1, 0, (float)z + 1}, d[3] = {(float)x + 1, 0, (float)z};
+			AddQuad(tree, a, b, c, d);
+		}
+	const float y0 = 2.365f, y1 = 2.475f, z0 = -0.0223f, z1 = 0.0523f, x0 = -2, x1 = 2;
+	float p[8][3] = {{x0,y0,z0},{x1,y0,z0},{x1,y0,z1},{x0,y0,z1},{x0,y1,z0},{x1,y1,z0},{x1,y1,z1},{x0,y1,z1}};
+	AddQuad(tree, p[0], p[1], p[2], p[3]);   // underside, facing down
+	AddQuad(tree, p[4], p[7], p[6], p[5]);   // top, facing up
+	AddQuad(tree, p[0], p[4], p[5], p[1]);   // side facing -z
+	AddQuad(tree, p[3], p[2], p[6], p[7]);   // side facing +z
+	NewtonTreeCollisionEndBuild(tree, 1);
+	LevelBody(w, tree);
+}
+
+static void TestLevelMesh()
+{
+	Section("Level meshes");
+	NewtonWorld* w = NewtonCreate(NULL, NULL);
+	BuildLevel(w);
+
+	// A box dropped on the tiled floor comes to rest on it.
+	NewtonBody* box = Box(w, 0.5f, 0.5f, 0.5f, 1, 0.3f, 1, 0.3f);
+	// Three boxes stacked across tile edges stay stacked.
+	NewtonBody* s0 = Box(w, 0.5f, 0.5f, 0.5f, 1, -2, 0.25f, 1);
+	NewtonBody* s1 = Box(w, 0.5f, 0.5f, 0.5f, 1, -2, 0.75f, 1);
+	NewtonBody* s2 = Box(w, 0.5f, 0.5f, 0.5f, 1, -2, 1.25f, 1);
+	// A box sliding over many tile edges keeps its height and slows down.
+	NewtonBody* slider = Box(w, 0.5f, 0.5f, 0.5f, 1, 2, 0.25f, -3);
+	float v[3] = {0, 0, 4};
+	NewtonBodySetVelocity(slider, v);
+	Step(w, 180);
+
+	float m[16];
+	NewtonBodyGetMatrix(box, m);
+	Check("box dropped on a tiled floor rests on it", std::fabs(m[13] - 0.25f) < 0.02f);
+	NewtonBodyGetMatrix(s2, m);
+	Check("three stacked boxes stay stacked", std::fabs(m[13] - 1.25f) < 0.03f && std::fabs(m[12] + 2) < 0.05f && std::fabs(m[14] - 1) < 0.05f);
+	(void)s0; (void)s1;
+	NewtonBodyGetMatrix(slider, m);
+	NewtonBodyGetVelocity(slider, v);
+	Check("box sliding over tile edges keeps its height", std::fabs(m[13] - 0.25f) < 0.02f);
+	Check("and slides on before friction stops it", m[14] > -2.5f && Length(v) < 0.5f);
+
+	// The boat lamp's rod: a 0.85 m bar on a ball joint at y = 2.397, with
+	// its top 6.6 cm up inside the beam. Old Newton leaves it hanging
+	// straight; Newton 4 alone pushed it to its 30 degree cone limit.
+	NewtonBody* rod = Box(w, 0.052168f, 0.847362f, 0.053070f, 1.1f, 0, 2.397f - 0.389f, 0);
+	float pivot[3] = {0, 2.397f, 0}, pin[3] = {0, 1, 0};
+	NewtonJoint* j = NewtonConstraintCreateBall(w, pivot, rod, NULL);
+	NewtonBallSetConeLimits(j, pin, 30 * 3.14159265f / 180, 10 * 3.14159265f / 180);
+	float maxTilt = 0;
+	for (int i = 0; i < 120; i++)
+	{
+		NewtonUpdate(w, kStep);
+		NewtonBodyGetMatrix(rod, m);
+		maxTilt = std::fmax(maxTilt, std::acos(std::fmin(1.0f, m[5])) * 180 / 3.14159265f);
+	}
+	Check("bar hooked into a ceiling beam hangs straight (within 2 degrees)", maxTilt < 2);
+	NewtonDestroy(w);
+}
+
 int main()
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -667,6 +762,7 @@ int main()
 	TestMaterials();
 	TestJointUtilities();
 	TestSafety();
+	TestLevelMesh();
 	printf("\n%d of %d checks passed%s\n", gChecks - gFailures, gChecks, gFailures ? "" : ": all good");
 	return gFailures ? 1 : 0;
 }

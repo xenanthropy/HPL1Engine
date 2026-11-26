@@ -116,14 +116,24 @@ behaviour, to keep the game's physics feel.
     Penumbra's grab damping, which overshoots on a thin body, made the boat
     lamp spin up without bound and fly away. Only bodies spinning faster
     than about 47 rad/s at 60 Hz are affected.
+11. Level mesh faces (Phase 6): `ndShapeConvexPolygon::CalculateContactToConvexHullDescrete`
+    skips a mesh face when a penetrating body could leave it sideways, across
+    one of its edges, in less than its depth along the face normal. Newton
+    2.x (checked against ScummVM's 2.36; we assume 1.53 too) treats a face as
+    a thin plate and pushes out along the shortest way (EPA); when that way is
+    sideways it makes no contact. Newton 4 always
+    pushed along the normal, so a body starting partly buried in level
+    geometry was shoved hard to one side: the boat lamp's rod, whose hook sits
+    6.6 cm inside its ceiling beam, was held at its 30 degree cone limit.
+    Shallow resting contacts are unchanged.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 61 checks covering buffers, shape collision, joint readouts and
+uses it: 66 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
-the world box, NaN guard and spin cap. It
+the world box, NaN guard, spin cap and level meshes. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh
