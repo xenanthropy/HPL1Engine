@@ -83,7 +83,11 @@ class ndBodyDynamic: public ndBodyKinematic
 
 	D_NEWTON_API virtual void IntegrateGyroSubstep(const ndVector& timestep) override;
 	D_NEWTON_API virtual ndJacobian IntegrateForceAndToque(const ndVector& force, const ndVector& torque, const ndVector& timestep) const override;
+	// HPL1Engine: protected (was private) so the 1.53 layer's body subclass can
+	// apply per-body freeze thresholds and then call this.
+	protected:
 	D_NEWTON_API virtual void EvaluateSleepState(ndFloat32 freezeSpeed2, ndFloat32 freezeAccel2) override;
+	private:
 	D_NEWTON_API virtual void Serialize(ndSharedPtr<ndMeshBody>& body) const override;
 
 	ndVector m_externalForce;

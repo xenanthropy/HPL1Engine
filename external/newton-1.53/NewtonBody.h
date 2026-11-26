@@ -57,4 +57,36 @@ class ndNewtonBodyNotify : public ndModelBodyNotify
 	NewtonApplyForceAndTorque m_onForceAndTorque;
 };
 
+// HPL1Engine: rigid body with 1.53-style per-body freeze thresholds.
+// Newton 4 only has world-wide sleep thresholds, but HPL1 sets them per body
+// through NewtonBodySetFreezeTreshold (default 0.01 for both speed^2 and
+// omega^2, which is much looser than Newton 4's 0.032^2). Bodies that never
+// get thresholds keep Newton 4's world values. The class name reported for
+// reflection stays "ndBodyDynamic".
+class ndNewtonBodyDynamic : public ndBodyDynamic
+{
+	public:
+	ndNewtonBodyDynamic()
+		:ndBodyDynamic()
+		,m_freezeSpeed2(ndFloat32(-1.0f))
+		,m_freezeOmega2(ndFloat32(-1.0f))
+	{
+	}
+
+	virtual void EvaluateSleepState(ndFloat32 freezeSpeed2, ndFloat32 freezeAccel2) override
+	{
+		if (m_freezeSpeed2 >= ndFloat32(0.0f))
+		{
+			// Newton 4 tests speed^2 and omega^2 against one value. HPL1
+			// normally passes the same value for both; if they differ, use
+			// the stricter one.
+			freezeSpeed2 = ndMin(m_freezeSpeed2, m_freezeOmega2);
+		}
+		ndBodyDynamic::EvaluateSleepState(freezeSpeed2, freezeAccel2);
+	}
+
+	ndFloat32 m_freezeSpeed2;
+	ndFloat32 m_freezeOmega2;
+};
+
 #endif

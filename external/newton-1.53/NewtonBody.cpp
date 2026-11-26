@@ -422,7 +422,8 @@ void NewtonBodyGetAABB(const NewtonBody* bodyPtr, dFloat* p0, dFloat* p1)
 NewtonBody* NewtonCreateBody(const NewtonWorld* newtonWorld, const NewtonCollision* collision)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndSharedPtr<ndBody> body(new ndBodyDynamic());
+	// HPL1Engine: create our subclass so per-body freeze thresholds work.
+	ndSharedPtr<ndBody> body(new ndNewtonBodyDynamic());
 	ndBodyDynamic* const dynBody = body->GetAsBodyDynamic();
 
 	ndNewtonWorld* const world = PointerCast<ndNewtonWorld, NewtonWorld>(newtonWorld);
