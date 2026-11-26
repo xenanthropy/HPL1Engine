@@ -23,10 +23,12 @@
 #include <angelscript.h>
 
 #ifdef __GNUC__
-	#ifdef __ppc__
-		#define __stdcall
-	#else
+	// stdcall only exists on 32-bit x86. Everywhere else (x86-64, ARM, PPC)
+	// GCC ignores the attribute with a warning, so leave it out.
+	#if defined(__i386__)
 		#define __stdcall __attribute__((stdcall))
+	#else
+		#define __stdcall
 	#endif
 #endif
 // Script Macros to build Generic wrappers if necessary
