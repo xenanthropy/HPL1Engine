@@ -24,6 +24,12 @@ original Penumbra Overture release shipped with.
    those letters, such as `int`, was split, and engine start-up failed with
    `as_arrayobject.cpp: RegisterArrayObject: Assertion 'r >= 0'`. Now an array,
    looped over `sizeof(whiteSpace) - 1`.
+3. `source/as_context.cpp`: the `PTRARG` macro read a bytecode pointer
+   argument as `asPTRWORD(*(x+1))`, where `x` is an `asDWORD *`. That reads
+   32 bits and widens them, so on 64-bit every pointer stored in the bytecode
+   (object types for `BC_ALLOC`, `BC_FREE`, `BC_OBJTYPE` and others) lost its
+   upper half, and the first script that made an object (a string) crashed.
+   Now `*(asPTRWORD*)(x+1)`.
 
 ## Build notes
 

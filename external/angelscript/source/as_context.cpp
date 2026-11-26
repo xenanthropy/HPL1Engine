@@ -1081,7 +1081,7 @@ void asCContext::CallInterfaceMethod(asCModule *mod, asCScriptFunction *func)
 #define INTARG(x)    (int(*(x+1)))
 #define QWORDARG(x)  (*(asQWORD*)(x+1))
 #define FLOATARG(x)  (*(float*)(x+1))
-#define PTRARG(x)    (asPTRWORD(*(x+1)))
+#define PTRARG(x)    (*(asPTRWORD*)(x+1)) // HPL1Engine: read a whole pointer; asPTRWORD(*(x+1)) read only 32 bits, cutting 64-bit pointers in half
 
 #define WORDARG0(x)   (*(((asWORD*)x)+1))
 #define WORDARG1(x)   (*(((asWORD*)x)+2))
