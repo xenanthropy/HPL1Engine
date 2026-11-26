@@ -61,6 +61,7 @@ class ndNewtonWorld: public ndWorld
 	// HPL1Engine: stops bodies that left the world box, and bodies whose
 	// matrix or velocity became NaN/inf (restored to their last good matrix).
 	void GuardBodies();
+	void WakeJoinedBodies();
 	ndVector m_worldMin;
 	ndVector m_worldMax;
 

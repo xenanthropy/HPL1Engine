@@ -156,11 +156,18 @@ behaviour, to keep the game's physics feel.
     beyond it. Newton 4 started at about 1/512 m and pushed five times as
     hard (stiffness 50), and the speed stayed on the body, so props popped
     out of each other and the lamp's rod was thrown out of its beam.
+15. Resting bodies joined to awake ones (`ndNewtonWorld::WakeJoinedBodies`,
+    newtonWorld.cpp): before each update, a resting dynamic body jointed to
+    an awake dynamic body is woken, as the 1.53 library does. HPL1 rests a
+    body sitting at a joint limit (`LimitAutoSleep`) after every step; Newton
+    4 then dragged it along through the joint but left it marked asleep and
+    never called its transform callback, so the outside hatch's wheel stayed
+    behind on screen while the hatch opened.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 76 checks covering buffers, shape collision, joint readouts and
+uses it: 77 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It

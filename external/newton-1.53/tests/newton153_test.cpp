@@ -88,6 +88,8 @@ static NewtonBody* Box(NewtonWorld* w, float sx, float sy, float sz, float mass,
 }
 static float BodyY(const NewtonBody* b) { float m[16]; NewtonBodyGetMatrix(b, m); return m[13]; }
 static float BodyX(const NewtonBody* b) { float m[16]; NewtonBodyGetMatrix(b, m); return m[12]; }
+static float gTipY = 0;
+static void TipMoved(const NewtonBody*, const float* m) { gTipY = m[13]; }
 
 //-----------------------------------------------------------------------------
 // 1. Buffers: functions that write into caller arrays stay inside them
@@ -370,6 +372,29 @@ static void TestBodies()
 	NewtonBodySetContinuousCollisionMode(b, 1); int a1 = NewtonBodyGetContinuousCollisionMode(b);
 	NewtonBodySetContinuousCollisionMode(b, 0); int a2 = NewtonBodyGetContinuousCollisionMode(b);
 	Check("continuous collision flag reads back (0, 1, 0)", a0 == 0 && a1 == 1 && a2 == 0);
+	NewtonDestroy(w);
+
+	// A body put to rest after every step (HPL1's LimitAutoSleep does this to
+	// a joint sitting at its limit) while the body it is hinged to swings:
+	// as in the 1.53 library it wakes each update, moves with it and gets its
+	// transform callback. Newton 4 alone dragged it along but never reported
+	// its matrix (the outside hatch's wheel stayed behind on screen).
+	w = NewtonCreate(NULL, NULL);
+	NewtonBody* arm = Box(w, 1, 0.1f, 0.1f, 1, 0.5f, 0, 0);
+	float armPin[3] = {0, 0, 1}, armPivot[3] = {0, 0, 0};
+	NewtonConstraintCreateHinge(w, armPivot, armPin, arm, NULL);
+	NewtonBody* tip = Box(w, 0.1f, 0.1f, 0.1f, 1, 1.0f, 0, 0, NoForce);
+	float tipPivot[3] = {1.0f, 0, 0};
+	NewtonConstraintCreateHinge(w, tipPivot, armPin, tip, arm);
+	NewtonBodySetTransformCallback(tip, TipMoved);
+	gTipY = 0;
+	for (int i = 0; i < 30; i++)
+	{
+		NewtonUpdate(w, kStep);
+		NewtonWorldFreezeBody(w, tip);
+	}
+	printf("  tip y %.3f, last reported y %.3f\n", BodyY(tip), gTipY);
+	Check("body rested after each step still follows the body it is hinged to", BodyY(tip) < -0.3f && std::fabs(gTipY - BodyY(tip)) < 0.02f);
 	NewtonDestroy(w);
 }
 

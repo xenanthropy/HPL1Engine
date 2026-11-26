@@ -286,9 +286,44 @@ void ndNewtonWorld::PostUpdate(ndFloat32 timestep)
 	}
 }
 
+// HPL1Engine: as in the 1.53 library, a resting body joined to an awake
+// dynamic body wakes at the start of the next update, so it moves with it
+// and gets its transform callback. HPL1 rests a body that sits at a joint
+// limit (LimitAutoSleep) after every step; Newton 4 then dragged it along
+// through the joint but left it marked asleep and never reported its new
+// matrix, so the outside hatch's wheel stayed behind on screen while the
+// hatch opened.
+void ndNewtonWorld::WakeJoinedBodies()
+{
+	bool changed = true;
+	while (changed)
+	{
+		changed = false;
+		const ndJointList& joints = GetJointList();
+		for (ndJointList::ndNode* node = joints.GetFirst(); node; node = node->GetNext())
+		{
+			ndJointBilateralConstraint* const joint = *node->GetInfo();
+			ndBodyKinematic* const body0 = joint->GetBody0();
+			ndBodyKinematic* const body1 = joint->GetBody1();
+			if ((body0->GetInvMass() <= ndFloat32(0.0f)) || (body1->GetInvMass() <= ndFloat32(0.0f)))
+			{
+				continue;
+			}
+			const bool asleep0 = body0->GetSleepState();
+			const bool asleep1 = body1->GetSleepState();
+			if (asleep0 != asleep1)
+			{
+				(asleep0 ? body0 : body1)->SetSleepState(false);
+				changed = true;
+			}
+		}
+	}
+}
+
 void ndNewtonWorld::Update(ndFloat32 timestep)
 {
 	//ndTrace(("%f\n", timestep));
+	WakeJoinedBodies();
 	ndWorld::Update(timestep);
 }
 
