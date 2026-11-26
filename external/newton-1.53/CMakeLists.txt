@@ -31,6 +31,12 @@ target_include_directories(newton153
 target_compile_definitions(newton153 PUBLIC _NEWTON_USE_LIB)
 target_compile_definitions(newton153 PRIVATE _CRT_SECURE_NO_WARNINGS)
 
+# HPL1Engine: run the whole update on the thread that calls NewtonUpdate, as
+# 1.53 did. HPL's force/torque, contact and joint callbacks then run on the
+# game thread, one after another, and its contact callbacks can keep their
+# state in statics. (Newton 4 otherwise runs the update on its own thread.)
+target_compile_definitions(newton153 PRIVATE D_USE_THREAD_EMULATION)
+
 if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
     # Same as upstream: GCC and Clang use the portable scalar math path
     # instead of the hand-written SSE vector class.

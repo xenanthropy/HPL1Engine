@@ -206,9 +206,11 @@ void ndThreadPool::ParallelExecute(const Function& function, ndInt32 workGroupCo
 		ndAssert(m_isInUpdate);
 		#ifdef	D_USE_THREAD_EMULATION
 			// in emulation mode, threads execute all task in the main thread
+			// HPL1Engine: pass the thread count too (the job signature gained
+			// it; this branch was left behind and no longer compiled).
 			for (ndInt32 i = 0; i < workGroupCount; ++i)
 			{
-				function(i, 0);
+				function(i, 0, threadCount);
 			}
 		#else	
 

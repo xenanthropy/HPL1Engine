@@ -129,7 +129,9 @@ ndNewtonWorld::ndNewtonWorld()
 	,m_onDestroyContact(nullptr)
 {
 	SetSubSteps(3);
-	//SetThreadCount(2);
+	// HPL1Engine: single-threaded, on the caller's thread (see
+	// D_USE_THREAD_EMULATION in CMakeLists.txt). Was: the default.
+	SetThreadCount(1);
 	SelectSolver(ndSimd8Solver);
 	SetContactCallback();
 }
