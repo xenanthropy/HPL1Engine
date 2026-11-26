@@ -38,6 +38,8 @@ class NewtonJointUserData: public ndJointUserData
 
 	ndWeakPtr<void> m_userData;
 	NewtonConstraintDestructor m_onDestroy;
+	// HPL1Engine: the value NewtonJointSetStiffness stored (1.53 default 0.9).
+	dFloat m_stiffness;
 };
 
 

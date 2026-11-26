@@ -18,6 +18,7 @@
 #include "NewtonBody.h"
 #include "NewtonUtils.h"
 #include "newtonWorld.h"
+#include "joints/NewtonJoints.h"
 
 //-----------------------------------------------------------------------------
 // World
@@ -233,4 +234,29 @@ void NewtonBallGetJointAngle(const NewtonJoint* ball, dFloat* angle)
 	angle[0] = -euler0.m_x;
 	angle[1] = -euler0.m_y;
 	angle[2] = -euler0.m_z;
+}
+
+//-----------------------------------------------------------------------------
+// Joint utilities (Phase 5, step 8: the layer only had these inside #if 0)
+//-----------------------------------------------------------------------------
+
+// Remove the joint from the world. Its user-data destructor callback runs
+// as the joint is deleted, as in 1.53.
+void NewtonDestroyJoint(const NewtonWorld* newtonWorld, const NewtonJoint* joint)
+{
+	TRACE_FUNCTION(__FUNCTION__);
+	ndNewtonWorld* const world = PointerCast<ndNewtonWorld, NewtonWorld>(newtonWorld);
+	world->RemoveJoint(PointerCast<ndJointBilateralConstraint, NewtonJoint>(joint));
+}
+
+int NewtonJointGetCollisionState(const NewtonJoint* joint)
+{
+	TRACE_FUNCTION(__FUNCTION__);
+	return PointerCast<ndJointBilateralConstraint, NewtonJoint>(joint)->IsCollidable() ? 1 : 0;
+}
+
+dFloat NewtonJointGetStiffness(const NewtonJoint* joint)
+{
+	TRACE_FUNCTION(__FUNCTION__);
+	return NewtonJointUserData::GetUserData(joint)->m_stiffness;
 }

@@ -22,6 +22,7 @@
 #include "newtonStdafx.h"
 #include "Newton.h"
 #include "NewtonBody.h"
+#include "joints/NewtonJoints.h"
 
 void NewtonSetWorldSize(const NewtonWorld* newtonWorld, const dFloat* minPoint, const dFloat* maxPoint)
 {
@@ -82,7 +83,9 @@ void NewtonMaterialSetDefaultSoftness(const NewtonWorld* const newtonWorld, int 
 void NewtonJointSetStiffness(const NewtonJoint* const jointPtr, dFloat stiffness)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
+	// HPL1Engine: stored so NewtonJointGetStiffness can report it, clamped
+	// as in 1.53. Newton 4 has no per-joint stiffness, so it has no effect.
+	NewtonJointUserData::GetUserData(jointPtr)->m_stiffness = ndClamp(stiffness, dFloat(0.0f), dFloat(1.0f));
 }
 
 // HPL1Engine: the four "Calculate Stop" helpers below were stubs returning 0.

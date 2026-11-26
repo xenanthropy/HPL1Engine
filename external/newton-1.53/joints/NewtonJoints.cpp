@@ -28,6 +28,7 @@ NewtonJointUserData::NewtonJointUserData(ndJointBilateralConstraint* const owner
 	:ndJointUserData(owner)
 	,m_onDestroy(nullptr)
 	,m_userData()
+	,m_stiffness(dFloat(0.9f))
 {
 }
 
@@ -295,8 +296,9 @@ void* NewtonJointGetUserData(const NewtonJoint* const joint)
 void NewtonJointSetCollisionState(const NewtonJoint* joint, int state)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	NewtonJointUserData* const jointData = NewtonJointUserData::GetUserData(joint);
-	ndAssert(0);
+	// HPL1Engine: implemented (was an assert). Newton 4's joints keep the
+	// same flag; 0 = the two bodies don't collide, the default, as in 1.53.
+	PointerCast<ndJointBilateralConstraint, NewtonJoint>(joint)->SetCollidable(state ? true : false);
 	//dgConstraint* contraint;
 	//contraint = (dgConstraint*)joint;
 	//return contraint->SetCollidable(state ? true : false);
