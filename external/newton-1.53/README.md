@@ -54,3 +54,16 @@ behaviour, to keep the game's physics feel.
    `NewtonBallGetJointAngle/Omega`, `NewtonMaterialGetContactForce`,
    `NewtonBodySetFreezeTreshold`, `NewtonSetSolverModel`,
    `NewtonSetFrictionModel`, `NewtonMaterialSetContinuousCollisionMode`.
+5. Stubs and behaviour fixes (Phase 5, step 5):
+   - `NewtonBodyGetSleepingState` returned 1 for sleeping; 1.53 returns 1
+     for active. Inverted.
+   - `NewtonAddBodyImpulse` (was empty): 1.53's "change the velocity of this
+     point by this much" impulse, from 2.36's `dgBody::AddImpulse`.
+   - `NewtonWorldFreezeBody` (was empty): clears velocity and sleeps the body.
+   - `NewtonHinge/Slider/CorkscrewCalculateStop*` (returned 0): 1.53/2.36's
+     formulas, in `NewtonDeprecated.cpp`.
+   - `NewtonBallSetConeLimits`: uses the given cone axis (was ignored), with
+     1.53's thresholds and clamps.
+   - `NewtonBodySet/GetContinuousCollisionMode`: the flag is stored on the
+     body and reported back (no simulation effect, as in 1.53).
+
