@@ -11,11 +11,10 @@ set(HPL_VERSION_MINOR 0)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Location of the historical prebuilt dependency bundle. Only AngelScript and
-# Newton still come from here; both are replaced by source builds later
-# (see ROADMAP.md, Phases 4 and 5).
+# Location of the historical prebuilt dependency bundle. Only Newton still
+# comes from here; it is replaced by a source build later (ROADMAP Phase 5).
 set(HPL_DEPENDENCIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies"
-    CACHE PATH "Folder holding the prebuilt AngelScript/Newton headers and libs")
+    CACHE PATH "Folder holding the prebuilt Newton header and library")
 
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
@@ -43,9 +42,8 @@ add_library(Newton STATIC IMPORTED)
 set_target_properties(Newton PROPERTIES
     IMPORTED_LOCATION ${HPL_DEPENDENCIES_DIR}/lib/linux/libNewton.a)
 
-add_library(angelscript STATIC IMPORTED)
-set_target_properties(angelscript PROPERTIES
-    IMPORTED_LOCATION ${HPL_DEPENDENCIES_DIR}/lib/linux/libangelscript.a)
+# AngelScript 2.7.1b, built from the vendored source.
+add_subdirectory(external/angelscript)
 
 # The OALWrapper target is defined by the top-level project, which adds
 # ../OALWrapper before this directory.
