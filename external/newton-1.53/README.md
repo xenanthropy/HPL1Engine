@@ -76,3 +76,20 @@ behaviour, to keep the game's physics feel.
    acceleration and its min/max force as bounds. The defaults are
    unbounded (were ±1e-20). The joint's angle/position are refreshed before
    the callback. Helpers in `joints/NewtonHPL1Joints.h`.
+7. Contacts and the world update (Phase 5, step 7):
+   - Contacts pick their material from the two bodies' 1.53 material groups
+     (`newtonWorld.cpp`). The core looked it up by shape user ids, which the
+     layer never set, so every contact used the default material and no
+     HPL1 contact callback ever ran. Pairs with group 0 get their own
+     material too.
+   - The core is built with `D_USE_THREAD_EMULATION` and one thread, so
+     `NewtonUpdate` runs on the calling thread, as in 1.53, and a pair's
+     begin/process/end callbacks run back to back. (`ndThreadPool.h`: the
+     emulation branch of `ParallelExecute` was fixed to compile.)
+   - One substep per update instead of 3.
+   - The standard solver instead of SIMD8, which mixed up the rows of
+     constraints with different row counts in one batch.
+   - `ndScene.cpp`: a pair rejected by the begin callback drops its
+     contacts; contacts of moving pairs are recomputed every step (no
+     contact cache, `HPL1_CONTACT_CACHE`).
+   - Elasticity clamped to 0.01..2, as in 1.53 (was 0..1).
