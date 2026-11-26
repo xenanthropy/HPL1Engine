@@ -111,7 +111,7 @@ namespace hpl {
 
 		if(mpFile)
 		{
-			fprintf(mpFile, asMessage.c_str());
+			fputs(asMessage.c_str(), mpFile);
 			fflush(mpFile);
 		}
 	}
