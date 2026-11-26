@@ -64,7 +64,7 @@ namespace hpl {
 
 		mvGfxElements.resize(eGuiSkinGfx_LastEnum, NULL);
 		mvFonts.resize(eGuiSkinFont_LastEnum, NULL);
-		mvAttributes.resize(eGuiSkinAttribute_LastEnum, NULL);
+		mvAttributes.resize(eGuiSkinAttribute_LastEnum, cVector3f(0));
 	}
 
 	//-----------------------------------------------------------------------
