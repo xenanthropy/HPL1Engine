@@ -16,6 +16,14 @@ original Penumbra Overture release shipped with.
 1. `include/angelscript.h`: `asSMethodPtr<N>::Convert` returned `0` from a
    function returning the `asUPtr` union. Old GCC never checked this
    uninstantiated template body; GCC 13 rejects it. Now `return asUPtr();`.
+2. `source/as_tokendef.h`, `source/as_tokenizer.cpp`: `whiteSpace` was a
+   `const char *`, and the tokenizer looped over `sizeof(whiteSpace)`
+   characters. That is 4 on 32-bit (the length of `" \t\r\n"`, right by luck)
+   but 8 on 64-bit, so it read past the string and counted `'\0'` and the bytes
+   after it (which included `'i'`) as white space. Any word starting with
+   those letters, such as `int`, was split, and engine start-up failed with
+   `as_arrayobject.cpp: RegisterArrayObject: Assertion 'r >= 0'`. Now an array,
+   looped over `sizeof(whiteSpace) - 1`.
 
 ## Build notes
 

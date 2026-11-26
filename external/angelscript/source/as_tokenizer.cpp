@@ -115,7 +115,7 @@ bool asCTokenizer::IsWhiteSpace()
 	for( n = 0; n < sourceLength; n++ )
 	{
 		bool isWhiteSpace = false;
-		for( int w = 0; w < (int)sizeof(whiteSpace); w++ )
+		for( int w = 0; w < (int)sizeof(whiteSpace) - 1; w++ ) // HPL1Engine: see as_tokendef.h
 		{
 			if( source[n] == whiteSpace[w] )
 			{

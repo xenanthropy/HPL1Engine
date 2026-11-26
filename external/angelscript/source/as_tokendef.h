@@ -273,7 +273,11 @@ sTokenWord const tokenWords[] =
 
 const asUINT numTokenWords = sizeof(tokenWords)/sizeof(sTokenWord);
 
-const char * const whiteSpace = " \t\r\n";
+// HPL1Engine: an array, not a pointer. The tokenizer loops over
+// sizeof(whiteSpace) - 1 characters; with a pointer that was sizeof(char*),
+// which is 4 on 32-bit (correct by luck) but 8 on 64-bit, so it read past the
+// string and treated '\0' and whatever followed it in memory as white space.
+const char whiteSpace[] = " \t\r\n";
 
 // Some keywords that are not considered tokens by the parser
 const char * const THIS_TOKEN = "this";
