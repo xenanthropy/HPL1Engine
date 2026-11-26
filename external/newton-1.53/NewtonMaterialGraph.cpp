@@ -1231,7 +1231,8 @@ void NewtonMaterialSetDefaultElasticity(const NewtonWorld* const newtonWorld, in
 	ndNewtonWorld* const world = PointerCast<ndNewtonWorld, NewtonWorld>(newtonWorld);
 
 	ndMaterial* const material = world->GetMaterial(id0, id1);
-	material->m_restitution = ndClamp(elasticCoef, ndFloat32(0.0f), ndFloat32(1.0f));
+	// HPL1Engine: 1.53's clamp (was 0..1).
+	material->m_restitution = ndClamp(elasticCoef, ndFloat32(0.01f), ndFloat32(2.0f));
 }
 
 /*!
@@ -1596,7 +1597,8 @@ void NewtonMaterialSetContactElasticity(const NewtonMaterial* materialHandle, dF
 	//material = (dgContactMaterial*)materialHandle;
 	//material->m_restitution = ClampValue(restitution, dFloat(0.01f), dFloat(2.0f));
 	ndContactMaterial* const material = PointerCast<ndContactMaterial, NewtonMaterial>(materialHandle);
-	material->m_material.m_restitution = ndClamp(restitution, dFloat(0.0f), dFloat(1.0f));
+	// HPL1Engine: 1.53's clamp (was 0..1).
+	material->m_material.m_restitution = ndClamp(restitution, dFloat(0.01f), dFloat(2.0f));
 }
 
 // Name: NewtonMaterialSetContactFrictionState 
