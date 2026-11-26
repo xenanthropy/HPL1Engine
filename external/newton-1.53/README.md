@@ -35,3 +35,22 @@ behaviour, to keep the game's physics feel.
      `PostTransformUpdate` inside the class body.
    - `joints/NewtonJoints.cpp`: the new joint user data is put in a local
      before `SetUserData`, which takes a non-const reference.
+2. Matrix copy overrun on GCC/Clang (memory corruption, real bug):
+   `ndMatrix(const ndFloat32*)` in `newton-4/source/ndMatrix.h`,
+   `NewtonBodyGetMatrix` and `NewtonConvexHullModifierGetMatrix` copied
+   `sizeof(ndMatrix)/sizeof(ndFloat32)` floats. Under the Itanium C++ ABI
+   (GCC, Clang) `ndMatrix` is 96 bytes with `m_front` at offset 16, because
+   it and its `ndVector` members share the empty base `ndClassAlloc`; MSVC
+   lays it out as 64 bytes. So 24 floats were copied instead of 16, writing
+   past the matrix or the caller's 16-float buffer. Now exactly 16.
+3. Per-body freeze thresholds: `NewtonBody.h` adds `ndNewtonBodyDynamic`
+   (used by `NewtonCreateBody`), which applies the speed^2/omega^2 limits from
+   `NewtonBodySetFreezeTreshold` in `EvaluateSleepState`. In the core,
+   `ndBodyDynamic::EvaluateSleepState` moved from private to protected so the
+   subclass can call it.
+4. `NewtonHPL1Engine.cpp` (new) and a block at the end of `Newton.h`: the 12
+   1.53 functions HPL1Engine calls that the layer declared without defining:
+   `NewtonCollisionCollide`, `NewtonBall/Hinge/Slider/CorkscrewGetJointForce`,
+   `NewtonBallGetJointAngle/Omega`, `NewtonMaterialGetContactForce`,
+   `NewtonBodySetFreezeTreshold`, `NewtonSetSolverModel`,
+   `NewtonSetFrictionModel`, `NewtonMaterialSetContinuousCollisionMode`.

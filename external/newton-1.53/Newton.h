@@ -625,6 +625,16 @@ extern "C" {
 	NEWTON_API void NewtonVehicleSetDebugDisplay(const NewtonVehicle* const vehicle, NewtonDrawDebugLine drawLine);
 	NEWTON_API void NewtonVehicleFinishAssembly(const NewtonWorld* const newtonWorld, const NewtonVehicle* const vehicle);
 
+	// HPL1Engine: 1.53 functions that HPL1Engine calls but that this layer
+	// had no definition for (their declarations above are disabled or
+	// commented out). Implemented in NewtonHPL1Engine.cpp.
+	NEWTON_API void NewtonSetSolverModel(const NewtonWorld* newtonWorld, int model);
+	NEWTON_API void NewtonSetFrictionModel(const NewtonWorld* newtonWorld, int model);
+	NEWTON_API void NewtonMaterialSetContinuousCollisionMode (const NewtonWorld* newtonWorld, int id0, int id1, int state);
+	NEWTON_API int NewtonCollisionCollide (const NewtonWorld* newtonWorld, int maxSize,
+		const NewtonCollision* collsionA, const dFloat* matrixA, const NewtonCollision* collsionB, const dFloat* matrixB,
+		dFloat* contacts, dFloat* normals, dFloat* penetration);
+
 #ifdef __cplusplus 
 }
 #endif
