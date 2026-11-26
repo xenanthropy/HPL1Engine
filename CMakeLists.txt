@@ -33,10 +33,22 @@ list(REMOVE_DUPLICATES all_sources)
 
 add_library(HPL STATIC ${all_sources})
 
-# Newton 1.53 API (Julio Jerez's compatibility layer on the Newton 4 core),
-# built from the vendored source. Replaces the old prebuilt 32-bit
-# libNewton.a.
-add_subdirectory(external/newton-1.53)
+# Newton 1.53 API, built from vendored source (replaces the old prebuilt
+# 32-bit libNewton.a). Two cores are available while we compare them:
+#   4   - Julio Jerez's compatibility layer on the Newton 4 core (default)
+#   236 - our 1.53 API on the Newton 2.36 core (ScummVM's copy)
+set(HPL1_NEWTON_CORE "4" CACHE STRING "Newton core under the 1.53 API: 4 or 236")
+set_property(CACHE HPL1_NEWTON_CORE PROPERTY STRINGS 4 236)
+if(HPL1_NEWTON_CORE STREQUAL "4")
+    add_subdirectory(external/newton-1.53)
+    set(HPL1_NEWTON_TARGET newton153)
+elseif(HPL1_NEWTON_CORE STREQUAL "236")
+    add_subdirectory(external/newton-2.36)
+    set(HPL1_NEWTON_TARGET newton236)
+else()
+    message(FATAL_ERROR "HPL1_NEWTON_CORE must be 4 or 236 (got '${HPL1_NEWTON_CORE}')")
+endif()
+message(STATUS "HPL1Engine: Newton core ${HPL1_NEWTON_CORE}")
 
 # AngelScript 2.7.1b, built from the vendored source.
 add_subdirectory(external/angelscript)
@@ -63,7 +75,7 @@ target_include_directories(HPL
 target_link_libraries(HPL
     PUBLIC
         OALWrapper
-        newton153
+        ${HPL1_NEWTON_TARGET}
         angelscript
         Cg::Cg
         GLEW::GLEW
