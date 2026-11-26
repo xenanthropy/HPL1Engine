@@ -134,7 +134,11 @@ ndNewtonWorld::ndNewtonWorld()
 	// HPL1Engine: single-threaded, on the caller's thread (see
 	// D_USE_THREAD_EMULATION in CMakeLists.txt). Was: the default.
 	SetThreadCount(1);
-	SelectSolver(ndSimd8Solver);
+	// HPL1Engine: the standard solver. The SIMD8 one mixes up the rows of
+	// joints and contacts with different row counts in the same batch (seen:
+	// a frictionless contact made the next box's contact frictionless too),
+	// and with one thread and scalar maths it gains nothing.
+	SelectSolver(ndStandardSolver);
 	SetContactCallback();
 }
 
