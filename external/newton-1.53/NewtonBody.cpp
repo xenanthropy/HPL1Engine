@@ -1286,18 +1286,67 @@ int NewtonBodyGetJointRecursiveCollision(const NewtonBody* bodyPtr)
 void NewtonAddBodyImpulse(const NewtonBody* bodyPtr, const dFloat* pointDeltaVeloc, const dFloat* pointPosit)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndBody* const body = PointerCast<ndBody, NewtonBody>(bodyPtr);
-	ndAssert(0);
-	//dgBody* body;
-	//dgWorld* world;
-	//
-	//body = (dgBody*)bodyPtr;
-	//world = body->GetWorld();
-	//
-	//dgVector p(pointPosit);
-	//dgVector v(pointDeltaVeloc);
-	//
-	//world->AddBodyImpulse(body, v, p);
+	// HPL1Engine: implemented (was an empty stub). Same maths as 1.53/2.36's
+	// dgBody::AddImpulse: find the impulse P that changes the velocity of the
+	// point pointPosit by exactly pointDeltaVeloc, then apply it to the body's
+	// linear and angular velocity. Note pointDeltaVeloc is a velocity change,
+	// not an impulse.
+	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
+	const ndFloat32 invMass = body->GetInvMass();
+	if (invMass <= ndFloat32(0.0f))
+	{
+		return;
+	}
+
+	const ndMatrix invInertia(body->CalculateInvInertiaMatrix());
+	const ndVector com(body->GetMatrix().TransformVector(body->GetCentreOfMass()));
+	const ndVector point(pointPosit[0], pointPosit[1], pointPosit[2], ndFloat32(1.0f));
+	const ndVector r((point - com) & ndVector::m_triplexMask);
+	const ndVector deltaVeloc(pointDeltaVeloc[0], pointDeltaVeloc[1], pointDeltaVeloc[2], ndFloat32(0.0f));
+
+	// K maps an impulse at the point to the point's change in velocity:
+	// K * P = P / m + (invI * (r x P)) x r. Build it one column at a time.
+	ndFloat32 k[3][3];
+	for (ndInt32 j = 0; j < 3; ++j)
+	{
+		ndVector e(ndVector::m_zero);
+		e[j] = ndFloat32(1.0f);
+		const ndVector col(e.Scale(invMass) + invInertia.RotateVector(r.CrossProduct(e)).CrossProduct(r));
+		k[0][j] = col.m_x;
+		k[1][j] = col.m_y;
+		k[2][j] = col.m_z;
+	}
+
+	// P = K^-1 * deltaVeloc (Cramer's rule; K is symmetric positive definite).
+	const ndFloat32 c00 = k[1][1] * k[2][2] - k[1][2] * k[2][1];
+	const ndFloat32 c01 = k[1][2] * k[2][0] - k[1][0] * k[2][2];
+	const ndFloat32 c02 = k[1][0] * k[2][1] - k[1][1] * k[2][0];
+	const ndFloat32 det = k[0][0] * c00 + k[0][1] * c01 + k[0][2] * c02;
+	if (ndAbs(det) < ndFloat32(1.0e-12f))
+	{
+		return;
+	}
+	const ndFloat32 invDet = ndFloat32(1.0f) / det;
+	ndFloat32 inv[3][3];
+	inv[0][0] = c00 * invDet;
+	inv[0][1] = (k[0][2] * k[2][1] - k[0][1] * k[2][2]) * invDet;
+	inv[0][2] = (k[0][1] * k[1][2] - k[0][2] * k[1][1]) * invDet;
+	inv[1][0] = c01 * invDet;
+	inv[1][1] = (k[0][0] * k[2][2] - k[0][2] * k[2][0]) * invDet;
+	inv[1][2] = (k[0][2] * k[1][0] - k[0][0] * k[1][2]) * invDet;
+	inv[2][0] = c02 * invDet;
+	inv[2][1] = (k[0][1] * k[2][0] - k[0][0] * k[2][1]) * invDet;
+	inv[2][2] = (k[0][0] * k[1][1] - k[0][1] * k[1][0]) * invDet;
+
+	ndVector impulse(ndVector::m_zero);
+	for (ndInt32 i = 0; i < 3; ++i)
+	{
+		impulse[i] = inv[i][0] * deltaVeloc.m_x + inv[i][1] * deltaVeloc.m_y + inv[i][2] * deltaVeloc.m_z;
+	}
+
+	// SetVelocity/SetOmega also wake the body, as 1.53 did.
+	body->SetVelocity(body->GetVelocity() + impulse.Scale(invMass));
+	body->SetOmega(body->GetOmega() + invInertia.RotateVector(r.CrossProduct(impulse)));
 }
 
 // Name: NewtonBodyAddBuoyancyForce 

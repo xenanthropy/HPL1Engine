@@ -282,13 +282,20 @@ void NewtonUpdate(const NewtonWorld* newtonWorld, dFloat timestep)
 // of objects that it is connected to.
 //
 // See also: NewtonWorldUnfreezeBody, NewtonBodySetAutoFreeze, NewtonBodyGetAutoFreeze
-void NewtonWorldFreezeBody(const NewtonWorld* newtonWorld, const NewtonBody* body)
+void NewtonWorldFreezeBody(const NewtonWorld* newtonWorld, const NewtonBody* bodyPtr)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndAssert(0);
-	//Newton* world;
-	//world = (Newton*)newtonWorld;
-	//world->FreezeBody((dgBody*)body);
+	// HPL1Engine: implemented (was an empty stub). Put the body at rest, the
+	// counterpart of NewtonWorldUnfreezeBody below. Its velocity is cleared
+	// so it doesn't resume moving when something wakes it. HPL1 uses this to
+	// disable bodies (e.g. doors that settle at a joint limit).
+	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
+	if (body->GetInvMass() > ndFloat32(0.0f))
+	{
+		body->SetVelocityNoSleep(ndVector::m_zero);
+		body->SetOmegaNoSleep(ndVector::m_zero);
+	}
+	body->SetSleepState(true);
 }
 
 // Name: NewtonWorldUnfreezeBody 
