@@ -291,9 +291,8 @@ void NewtonBodySetAutoactiveCallback(const NewtonBody* bodyPtr, NewtonBodyActiva
 void NewtonBodySetContinuousCollisionMode(const NewtonBody* body, unsigned state)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	// HPL1Engine: remember the flag so the getter reports it back, as 1.53
-	// did. It has no effect on the simulation: Newton 4 has no per-body
-	// switch (and the 1.53 docs above say the feature was disabled anyway).
+	// HPL1Engine: stored on the body; ndNewtonWorld::Update uses it for
+	// 1.53's continuous collision (with the material pair's switch).
 	ndNewtonBodyDynamic* const dynBody = dynamic_cast<ndNewtonBodyDynamic*>(PointerCast<ndBody, NewtonBody>(body));
 	if (dynBody)
 	{

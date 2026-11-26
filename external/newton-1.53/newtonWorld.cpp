@@ -19,6 +19,11 @@
 #include "NewtonVehicle.h"
 #include "NewtonMaterialGraph.h"
 
+// HPL1Engine: continuous collision limits (see ndNewtonWorld::Update).
+#define D_HPL_CONTINUOUS_MAX_PIECES		8
+#define D_HPL_CONTINUOUS_MIN_STEP		ndFloat32 (1.0e-4f)
+#define D_HPL_CONTINUOUS_MIN_ADVANCE	ndFloat32 (1.0e-3f)
+
 ndSpinLock ndNewtonWorld::m_globalCriticalSection;
 
 class ndNewtonContact : public ndContact
@@ -320,11 +325,156 @@ void ndNewtonWorld::WakeJoinedBodies()
 	}
 }
 
+// HPL1Engine: Newton 1.53's continuous collision. HPL1 turns it on for every
+// object body and every material pair. Measured with the original library: a
+// can-sized cylinder fired at a level wall bounces off at any speed up to 50
+// m/s, where Newton 4 (which has no continuous collision in its world step)
+// lets it pass from 5 m/s. 1.53 and 2.36 sweep a fast body along its path for
+// the step and solve its island in smaller steps when the sweep finds
+// something. Here: each fast body with the switch on is swept with Newton 4's
+// shape cast; if it would hit something during the step, the whole step is
+// split at the moment of impact (at most 8 pieces per update, as 2.36), so
+// the contact, its bounce and HPL's contact callbacks happen as usual. Steps
+// where nothing is about to be hit run unchanged.
+class ndHplContinuousCast : public ndConvexCastNotify
+{
+	public:
+	ndHplContinuousCast(ndNewtonWorld* const world, ndBodyKinematic* const body)
+		:ndConvexCastNotify()
+		,m_world(world)
+		,m_body(body)
+		,m_group(ndNewtonContactCallback::MaterialGroup(body))
+	{
+	}
+
+	virtual ndUnsigned32 OnRayPrecastAction(const ndBody* const bodyPtr, const ndShapeInstance* const) override
+	{
+		ndBodyKinematic* const other = const_cast<ndBody*>(bodyPtr)->GetAsBodyKinematic();
+		if (!other || (other == m_body) || other->GetAsBodyTriggerVolume())
+		{
+			return 0;
+		}
+		for (ndBodyKinematic::ndJointList::ndNode* node = m_body->GetJointList().GetFirst(); node; node = node->GetNext())
+		{
+			ndJointBilateralConstraint* const joint = node->GetInfo();
+			if (((joint->GetBody0() == other) || (joint->GetBody1() == other)) && !joint->IsCollidable())
+			{
+				return 0;
+			}
+		}
+		const ndMaterial* const material = m_world->GetMaterial(m_group, ndNewtonContactCallback::MaterialGroup(other));
+		if (!(material->m_flags & ndContactOptions::m_collisionEnable) ||
+			!(material->m_userFlags & D_HPL_MATERIAL_CONTINUOUS_COLLISION))
+		{
+			return 0;
+		}
+		return 1;
+	}
+
+	virtual ndFloat32 OnRayCastAction(const ndContactPoint&, ndFloat32 param) override
+	{
+		return param;
+	}
+
+	ndNewtonWorld* m_world;
+	ndBodyKinematic* m_body;
+	ndInt32 m_group;
+};
+
+// Sweeps one convex shape by step; returns the fraction of the step at which
+// it first hits something it collides with, or 1.
+ndFloat32 ndNewtonWorld::CastTimeOfImpact(ndBodyKinematic* const body, const ndShapeInstance& shape, const ndMatrix& origin, const ndVector& step, ndFloat32 travel)
+{
+	ndHplContinuousCast cast(this, body);
+	if (GetScene()->ConvexCast(cast, shape, origin, origin.m_posit + step) && (cast.m_param < ndFloat32(1.0f)))
+	{
+		// A body already touching (or this close to) what it hits has a
+		// contact this step, which handles it.
+		if ((cast.m_param * travel) > D_HPL_CONTINUOUS_MIN_ADVANCE)
+		{
+			return cast.m_param;
+		}
+	}
+	return ndFloat32(1.0f);
+}
+
+// Returns the earliest time of impact within timestep of a fast body with
+// continuous collision on, or timestep when there is none.
+ndFloat32 ndNewtonWorld::ContinuousCollisionTimeOfImpact(ndFloat32 timestep)
+{
+	ndFloat32 timeOfImpact = timestep;
+	const ndBodyListView& bodies = GetBodyList();
+	for (ndBodyListView::ndNode* node = bodies.GetFirst(); node; node = node->GetNext())
+	{
+		ndNewtonBodyDynamic* const body = dynamic_cast<ndNewtonBodyDynamic*>(*node->GetInfo());
+		if (!body || !body->m_continuousCollision || (body->GetInvMass() <= ndFloat32(0.0f)) || body->GetSleepState())
+		{
+			continue;
+		}
+
+		// 2.36's test: the step moves the body more than a quarter of its
+		// smallest radius (its spin adds up to its max - min radius).
+		const ndShapeInstance& shape = body->GetCollisionShape();
+		const ndFloat32 minRadius = shape.GetBoxMinRadius();
+		const ndVector veloc(body->GetVelocity());
+		const ndVector omega(body->GetOmega());
+		const ndFloat32 speed = ndSqrt(veloc.DotProduct(veloc).GetScalar());
+		const ndFloat32 spin2 = omega.DotProduct(omega).GetScalar() * timestep * timestep;
+		const ndFloat32 padding = (shape.GetBoxMaxRadius() - minRadius) * ndMin(ndSqrt(spin2), ndFloat32(1.0f));
+		const ndFloat32 travel = speed * timestep;
+		if ((travel + padding) <= (ndFloat32(0.25f) * minRadius))
+		{
+			continue;
+		}
+
+		// Newton 4 can't cast a compound shape: cast each of its parts.
+		const ndMatrix& matrix = body->GetMatrix();
+		const ndVector step(veloc.Scale(timestep));
+		ndFloat32 param = ndFloat32(1.0f);
+		const ndShapeCompound* const compound = const_cast<ndShape*>(shape.GetShape())->GetAsShapeCompound();
+		if (compound)
+		{
+			const ndMatrix origin(shape.GetLocalMatrix() * matrix);
+			ndShapeCompound::ndTreeArray::Iterator it(compound->GetTree());
+			for (it.Begin(); it; it++)
+			{
+				const ndShapeInstance* const part = compound->GetShapeInstance(it.GetNode());
+				if (const_cast<ndShape*>(part->GetShape())->GetAsShapeConvex())
+				{
+					param = ndMin(param, CastTimeOfImpact(body, *part, origin, step, travel));
+				}
+			}
+		}
+		else if (const_cast<ndShape*>(shape.GetShape())->GetAsShapeConvex())
+		{
+			param = CastTimeOfImpact(body, shape, matrix, step, travel);
+		}
+		timeOfImpact = ndMin(timeOfImpact, param * timestep);
+	}
+	return timeOfImpact;
+}
+
 void ndNewtonWorld::Update(ndFloat32 timestep)
 {
 	//ndTrace(("%f\n", timestep));
-	WakeJoinedBodies();
-	ndWorld::Update(timestep);
+	ndFloat32 remaining = timestep;
+	for (ndInt32 piece = 1; ; ++piece)
+	{
+		WakeJoinedBodies();
+		ndFloat32 step = remaining;
+		if (piece < D_HPL_CONTINUOUS_MAX_PIECES)
+		{
+			step = ndMax(ContinuousCollisionTimeOfImpact(remaining), D_HPL_CONTINUOUS_MIN_STEP);
+		}
+		if (step >= remaining)
+		{
+			ndWorld::Update(remaining);
+			break;
+		}
+		ndWorld::Update(step);
+		Sync();
+		remaining -= step;
+	}
 }
 
 

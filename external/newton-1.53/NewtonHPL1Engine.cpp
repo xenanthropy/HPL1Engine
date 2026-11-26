@@ -78,12 +78,22 @@ void NewtonBodySetFreezeTreshold(const NewtonBody* bodyPtr, dFloat freezeSpeedMa
 // Materials and contacts
 //-----------------------------------------------------------------------------
 
-// Newton 4 has no per-material continuous collision switch. (HPL1 only
-// enables it for the material pairs it configures; the bodies' own
-// continuous-collision setting is handled separately.)
-void NewtonMaterialSetContinuousCollisionMode(const NewtonWorld*, int, int, int)
+// HPL1Engine: as in 1.53, continuous collision needs this switch on for the
+// pair's material and NewtonBodySetContinuousCollisionMode on for the moving
+// body. Stored in the material's user flags; ndNewtonWorld::Update uses it.
+void NewtonMaterialSetContinuousCollisionMode(const NewtonWorld* newtonWorld, int id0, int id1, int state)
 {
 	TRACE_FUNCTION(__FUNCTION__);
+	ndNewtonWorld* const world = PointerCast<ndNewtonWorld, NewtonWorld>(newtonWorld);
+	ndMaterial* const material = world->GetMaterial(id0, id1);
+	if (state)
+	{
+		material->m_userFlags |= D_HPL_MATERIAL_CONTINUOUS_COLLISION;
+	}
+	else
+	{
+		material->m_userFlags &= ~D_HPL_MATERIAL_CONTINUOUS_COLLISION;
+	}
 }
 
 // Same as 1.53: the contact's solved normal force plus its two friction

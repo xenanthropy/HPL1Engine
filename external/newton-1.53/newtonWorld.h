@@ -18,6 +18,10 @@ struct NewtonBody;
 struct NewtonJoint;
 struct NewtonWorld;
 
+// HPL1Engine: bit in ndMaterial::m_userFlags set by
+// NewtonMaterialSetContinuousCollisionMode (off by default, as in 1.53).
+#define D_HPL_MATERIAL_CONTINUOUS_COLLISION ndUnsigned32(1)
+
 class ndNewtonWorld: public ndWorld
 {
 	public:
@@ -62,6 +66,9 @@ class ndNewtonWorld: public ndWorld
 	// matrix or velocity became NaN/inf (restored to their last good matrix).
 	void GuardBodies();
 	void WakeJoinedBodies();
+	// HPL1Engine: Newton 1.53's continuous collision (see newtonWorld.cpp).
+	ndFloat32 ContinuousCollisionTimeOfImpact(ndFloat32 timestep);
+	ndFloat32 CastTimeOfImpact(ndBodyKinematic* const body, const ndShapeInstance& shape, const ndMatrix& origin, const ndVector& step, ndFloat32 travel);
 	ndVector m_worldMin;
 	ndVector m_worldMax;
 

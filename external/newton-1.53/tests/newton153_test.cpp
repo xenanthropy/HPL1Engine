@@ -891,6 +891,71 @@ static void TestLevelMesh()
 	NewtonDestroy(w);
 }
 
+// A can fired at things. With continuous collision on for the body and the
+// material pair (HPL1 turns both on), the 1.53 library makes it bounce back
+// off a level wall, a 1 cm thin box and, with a two-part (compound) body, a
+// wall again, at speeds where a single step carries it right through. With
+// the body's switch off it passes through the wall, as in 1.53.
+static float FireAt(int target, float speed, int continuous, bool compound)
+{
+	NewtonWorld* w = NewtonCreate(NULL, NULL);
+	const int group = NewtonMaterialGetDefaultGroupID(w);
+	NewtonMaterialSetContinuousCollisionMode(w, group, group, 1);
+	if (target == 0)
+	{
+		NewtonCollision* tree = NewtonCreateTreeCollision(w, NULL);
+		NewtonTreeCollisionBeginBuild(tree);
+		float a[3] = {1, -2, 2}, b[3] = {1, 2, 2}, c[3] = {1, 2, -2}, d[3] = {1, -2, -2};
+		AddQuad(tree, a, b, c, d);   // wall at x = 1, facing -x
+		NewtonTreeCollisionEndBuild(tree, 0);
+		LevelBody(w, tree);
+	}
+	else
+	{
+		Box(w, 0.01f, 1, 1, 0, 1, 0, 0);
+	}
+	NewtonCollision* shape;
+	if (compound)
+	{
+		NewtonCollision* parts[2] = {NewtonCreateBox(w, 0.04f, 0.1f, 0.04f, NULL), NewtonCreateSphere(w, 0.03f, 0.03f, 0.03f, NULL)};
+		shape = NewtonCreateCompoundCollision(w, 2, parts);
+		NewtonReleaseCollision(w, parts[0]);
+		NewtonReleaseCollision(w, parts[1]);
+	}
+	else
+	{
+		shape = NewtonCreateCylinder(w, 0.033f, 0.12f, NULL);
+	}
+	NewtonBody* can = NewtonCreateBody(w, shape);
+	float m[16];
+	Translation(m, 0.5f, 0, 0);
+	NewtonBodySetMatrix(can, m);
+	float inertia[3], origin[3];
+	NewtonConvexCollisionCalculateInertialMatrix(shape, inertia, origin);
+	NewtonBodySetMassMatrix(can, 0.2f, inertia[0] * 0.2f, inertia[1] * 0.2f, inertia[2] * 0.2f);
+	NewtonReleaseCollision(w, shape);
+	NewtonBodySetForceAndTorqueCallback(can, NoForce);
+	NewtonBodySetAutoFreeze(can, 0);
+	NewtonBodySetLinearDamping(can, 0);
+	NewtonBodySetContinuousCollisionMode(can, continuous);
+	float v[3] = {speed, 0, 0};
+	NewtonBodySetVelocity(can, v);
+	Step(w, 30);
+	const float x = BodyX(can);
+	NewtonDestroy(w);
+	return x;
+}
+
+static void TestContinuousCollision()
+{
+	Section("Continuous collision");
+	Check("can at 20 m/s bounces off a level wall", FireAt(0, 20, 1, false) < 0.4f);
+	Check("can at 50 m/s bounces off a level wall", FireAt(0, 50, 1, false) < 0.4f);
+	Check("can at 20 m/s bounces off a 1 cm thin box", FireAt(1, 20, 1, false) < 0.4f);
+	Check("two-part body at 25 m/s bounces off a level wall", FireAt(0, 25, 1, true) < 0.4f);
+	Check("with the body's switch off, a can at 20 m/s passes through the wall", FireAt(0, 20, 0, false) > 1.5f);
+}
+
 int main()
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -905,6 +970,7 @@ int main()
 	TestJointUtilities();
 	TestSafety();
 	TestLevelMesh();
+	TestContinuousCollision();
 	printf("\n%d of %d checks passed%s\n", gChecks - gFailures, gChecks, gFailures ? "" : ": all good");
 	return gFailures ? 1 : 0;
 }

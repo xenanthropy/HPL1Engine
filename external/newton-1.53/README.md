@@ -65,7 +65,7 @@ behaviour, to keep the game's physics feel.
    - `NewtonBallSetConeLimits`: uses the given cone axis (was ignored), with
      1.53's thresholds and clamps.
    - `NewtonBodySet/GetContinuousCollisionMode`: the flag is stored on the
-     body and reported back (no simulation effect, as in 1.53).
+     body and reported back (used by item 16 since then).
 
 6. Joint limit callbacks (Phase 5, step 6): the hinge, slider and corkscrew
    wrappers called HPL1's callback but ignored what it returned, so no door,
@@ -163,14 +163,35 @@ behaviour, to keep the game's physics feel.
     4 then dragged it along through the joint but left it marked asleep and
     never called its transform callback, so the outside hatch's wheel stayed
     behind on screen while the hatch opened.
+16. Continuous collision (`ndNewtonWorld::Update`, newtonWorld.cpp), as
+    1.53. HPL1 turns it on for every object body and material pair, and the
+    original library honours it: a can-sized cylinder fired at a level wall
+    bounces off at any speed up to 50 m/s, where Newton 4 (no continuous
+    collision in its world step) let it through from 5 m/s, so fast-swung
+    or thrown props passed through walls. Before each update, every awake
+    body with the switch on that moves more than a quarter of its smallest
+    radius in the step (2.36's rule) is swept along its velocity with Newton
+    4's shape cast (compound shapes part by part), against bodies whose
+    material pair has the switch on (`NewtonMaterialSetContinuousCollisionMode`,
+    stored in `ndMaterial::m_userFlags`) and that it collides with. If it
+    would hit something during the step, the world takes the step in two
+    parts, split at the moment of impact, so the contact, its bounce and
+    HPL1's contact callbacks happen as usual; at most 8 parts per update,
+    as 2.36. A hit closer than 1 mm is left to the step's normal contact.
+    Steps with nothing about to be hit are unchanged. Differences from
+    1.53: it splits the whole world's step rather than only the fast body's
+    island, it sweeps without the body's spin, and it does not catch level
+    faces from behind (1.53 does). Rebound speeds match 2.36's within 1%;
+    1.53's are up to 12% lower at 5 to 20 m/s.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 77 checks covering buffers, shape collision, joint readouts and
+uses it: 82 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
-the world box, NaN guard, spin cap and level meshes. It
+the world box, NaN guard, spin cap, level meshes and continuous
+collision. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh
