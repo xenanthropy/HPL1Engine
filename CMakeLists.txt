@@ -1,5 +1,10 @@
-cmake_minimum_required (VERSION 2.6)
+cmake_minimum_required (VERSION 3.16)
 project (HPL)
+
+# The engine was written against C++98/03. Pin the standard explicitly
+# instead of relying on the compiler's default (gnu++17 on GCC 13).
+set(CMAKE_CXX_STANDARD 11)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(HPL_VERSION_MAJOR 1)
 set(HPL_VERSION_MINOR 0)
