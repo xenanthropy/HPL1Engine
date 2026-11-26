@@ -63,8 +63,9 @@ static void WaveGravity(const NewtonBody* b)
 	NewtonBodySetForce(b, f);
 }
 
-// A box body. mass 0 = static. Dynamic boxes get gravity and never auto-freeze
-// unless the test says otherwise.
+// A box body. mass 0 = static. Dynamic boxes get gravity, no damping (the
+// cores' defaults differ, and HPL1 sets damping on every entity body), and
+// never auto-freeze unless the test says otherwise.
 static NewtonBody* Box(NewtonWorld* w, float sx, float sy, float sz, float mass,
 	float x, float y, float z, NewtonApplyForceAndTorque force = Gravity)
 {
@@ -79,6 +80,9 @@ static NewtonBody* Box(NewtonWorld* w, float sx, float sy, float sz, float mass,
 		NewtonBodySetMassMatrix(b, mass, mass*s2/6, mass*s2/6, mass*s2/6);
 		NewtonBodySetForceAndTorqueCallback(b, force);
 		NewtonBodySetAutoFreeze(b, 0);
+		const float noDamping[3] = {0, 0, 0};
+		NewtonBodySetLinearDamping(b, 0);
+		NewtonBodySetAngularDamping(b, noDamping);
 	}
 	return b;
 }
@@ -208,10 +212,14 @@ static void TestJointReadouts()
 	Step(w, 30);
 	printf("  after 0.5 s: hinge angle %.4f omega %.4f, slider posit %.4f veloc %.4f\n",
 		NewtonHingeGetJointAngle(hj), NewtonHingeGetJointOmega(hj), NewtonSliderGetJointPosit(sj), NewtonSliderGetJointVeloc(sj));
+	// 2.36 (like 1.x) reports the angle and position its joint callback saw
+	// during the last step, i.e. before that step moved the body: one step
+	// behind. Either reading is accepted; the point here is the sign.
+	const float hingeAngle = NewtonHingeGetJointAngle(hj), sliderPosit = NewtonSliderGetJointPosit(sj);
 	Check("hinge angle +0.5 rad and omega +1 after spinning +1 rad/s for 0.5 s",
-		std::fabs(NewtonHingeGetJointAngle(hj) - 0.5f) < 0.01f && std::fabs(NewtonHingeGetJointOmega(hj) - 1) < 0.01f);
+		hingeAngle > 0.5f - 1.0f * kStep - 0.01f && hingeAngle < 0.51f && std::fabs(NewtonHingeGetJointOmega(hj) - 1) < 0.01f);
 	Check("slider posit +0.25 and veloc +0.5 after 0.5 s at +0.5 m/s",
-		std::fabs(NewtonSliderGetJointPosit(sj) - 0.25f) < 0.01f && std::fabs(NewtonSliderGetJointVeloc(sj) - 0.5f) < 0.01f);
+		sliderPosit > 0.25f - 0.5f * kStep - 0.01f && sliderPosit < 0.26f && std::fabs(NewtonSliderGetJointVeloc(sj) - 0.5f) < 0.01f);
 
 	// the stop helpers (2.36 formulas): accel back to the stop + cancel the speed
 	NewtonHingeSliderUpdateDesc d;
@@ -250,7 +258,9 @@ static void TestBodies()
 	NewtonBodySetFreezeTreshold(held, 0.01f, 0.01f, 10);   // HPL1's default
 	Step(w, 30);
 	float v[3] = {0.06f, 0, 0};   // speed^2 0.0036: under HPL1's 0.01, over Newton 4's own limit
-	NewtonBodySetVelocity(plain, v); NewtonBodySetVelocity(held, v);
+	float fast[3] = {1, 0, 0};    // well over any freeze threshold: this check is about the
+	                              // return value; 1.53 would also rest a slow body by default
+	NewtonBodySetVelocity(plain, fast); NewtonBodySetVelocity(held, v);
 	Step(w, 60);
 	Check("NewtonBodyGetSleepingState: 1 = active (as 1.53)", NewtonBodyGetSleepingState(plain) == 1);
 	Check("per-body freeze threshold: a body under it goes to sleep (0)", NewtonBodyGetSleepingState(held) == 0);
