@@ -11,11 +11,6 @@ set(HPL_VERSION_MINOR 0)
 
 list(APPEND CMAKE_MODULE_PATH ${CMAKE_CURRENT_SOURCE_DIR}/cmake)
 
-# Location of the historical prebuilt dependency bundle. Only Newton still
-# comes from here; it is replaced by a source build later (ROADMAP Phase 5).
-set(HPL_DEPENDENCIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies"
-    CACHE PATH "Folder holding the prebuilt Newton header and library")
-
 find_package(OpenGL REQUIRED)
 find_package(GLEW REQUIRED)
 find_package(SDL REQUIRED)
@@ -38,14 +33,10 @@ list(REMOVE_DUPLICATES all_sources)
 
 add_library(HPL STATIC ${all_sources})
 
-add_library(Newton STATIC IMPORTED)
-set_target_properties(Newton PROPERTIES
-    IMPORTED_LOCATION ${HPL_DEPENDENCIES_DIR}/lib/linux/libNewton.a)
-
-# Newton 1.53 compatibility layer, built from the vendored source. Not linked
-# into HPL yet (Phase 5 in progress); build it on its own with the
-# "newton153" target.
-add_subdirectory(external/newton-1.53 EXCLUDE_FROM_ALL)
+# Newton 1.53 API (Julio Jerez's compatibility layer on the Newton 4 core),
+# built from the vendored source. Replaces the old prebuilt 32-bit
+# libNewton.a.
+add_subdirectory(external/newton-1.53)
 
 # AngelScript 2.7.1b, built from the vendored source.
 add_subdirectory(external/angelscript)
@@ -63,7 +54,6 @@ get_filename_component(SDL_PARENT_INCLUDE_DIR ${SDL_INCLUDE_DIR} DIRECTORY)
 target_include_directories(HPL
     PUBLIC
         ${CMAKE_CURRENT_SOURCE_DIR}/include
-        ${HPL_DEPENDENCIES_DIR}/include
         ${SDL_INCLUDE_DIR}
         ${SDL_PARENT_INCLUDE_DIR}
         ${SDL_IMAGE_INCLUDE_DIRS}
@@ -73,7 +63,7 @@ target_include_directories(HPL
 target_link_libraries(HPL
     PUBLIC
         OALWrapper
-        Newton
+        newton153
         angelscript
         Cg::Cg
         GLEW::GLEW

@@ -93,3 +93,11 @@ behaviour, to keep the game's physics feel.
      contacts; contacts of moving pairs are recomputed every step (no
      contact cache, `HPL1_CONTACT_CACHE`).
    - Elasticity clamped to 0.01..2, as in 1.53 (was 0..1).
+8. Linking into HPL1Engine (Phase 5, step 8):
+   - `NewtonDestroyJoint`, `NewtonJointGetCollisionState` and
+     `NewtonJointGetStiffness` only existed inside `#if 0`; defined in
+     `NewtonHPL1Engine.cpp`. `NewtonJointSetCollisionState` asserted and
+     did nothing; it now sets the joint's collidable flag.
+     `NewtonJointSetStiffness` stores the value (default 0.9, as in 1.53)
+     so it can be read back; it has no effect on Newton 4.
+   - `Newton.h` includes `<stddef.h>` for `size_t`.
