@@ -417,6 +417,13 @@ void NewtonWorldUnfreezeBody(const NewtonWorld* newtonWorld, const NewtonBody* b
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 	body->SetSleepState(false);
+	// HPL1Engine: waking a body starts its quiet-step count again, as in 1.53
+	// (see ndNewtonBodyDynamic::EvaluateSleepState).
+	ndNewtonBodyDynamic* const dynBody = dynamic_cast<ndNewtonBodyDynamic*>(body);
+	if (dynBody)
+	{
+		dynBody->m_quietFrames = 0;
+	}
 }
 
 // Name: NewtonWorldRayCast 

@@ -54,6 +54,14 @@ static void Gravity(const NewtonBody* b)
 	NewtonBodySetForce(b, f);
 }
 static void NoForce(const NewtonBody*) {}
+static float gWaveAngle = 0;   // gravity tilt about z (rad), like the boat's sway
+static void WaveGravity(const NewtonBody* b)
+{
+	float m, ix, iy, iz;
+	NewtonBodyGetMassMatrix(b, &m, &ix, &iy, &iz);
+	float f[3] = {std::sin(gWaveAngle) * 9.81f * m, -std::cos(gWaveAngle) * 9.81f * m, 0};
+	NewtonBodySetForce(b, f);
+}
 
 // A box body. mass 0 = static. Dynamic boxes get gravity and never auto-freeze
 // unless the test says otherwise.
@@ -246,6 +254,34 @@ static void TestBodies()
 	Step(w, 60);
 	Check("NewtonBodyGetSleepingState: 1 = active (as 1.53)", NewtonBodyGetSleepingState(plain) == 1);
 	Check("per-body freeze threshold: a body under it goes to sleep (0)", NewtonBodyGetSleepingState(held) == 0);
+	NewtonBodySetVelocity(held, v);
+	Step(w, 5);
+	const bool awakeAfter5 = NewtonBodyGetSleepingState(held) == 1;
+	Step(w, 30);
+	Check("...but only after framesCount (10) quiet steps in a row", awakeAfter5 && NewtonBodyGetSleepingState(held) == 0);
+	NewtonDestroy(w);
+
+	// Penumbra's boat (cEffect_WaveGravity) tilts gravity slowly and wakes
+	// every body each frame. A lamp hanging from the ceiling must keep
+	// swinging with it, not stop dead whenever it slows down.
+	w = NewtonCreate(NULL, NULL);
+	NewtonBody* lamp = Box(w, .1f, .3f, .1f, 1.1f, 0, -0.6f, 0, WaveGravity);
+	NewtonBodySetAutoFreeze(lamp, 1);
+	NewtonBodySetFreezeTreshold(lamp, 0.01f, 0.01f, 10);
+	float pivot[3] = {0, 0, 0};
+	NewtonConstraintCreateBall(w, pivot, lamp, NULL);
+	int stopped = 0;
+	float lastX = BodyX(lamp);
+	for (int i = 0; i < 600; i++)
+	{
+		gWaveAngle = 6.0f * 3.14159265f / 180.0f * std::sin(i * kStep * 2.0f * 3.14159265f / 8.0f);
+		NewtonWorldUnfreezeBody(w, lamp);
+		NewtonUpdate(w, kStep);
+		if (std::fabs(BodyX(lamp) - lastX) < 1e-5f) stopped++;
+		lastX = BodyX(lamp);
+	}
+	printf("  lamp in the boat's sway: stood still on %d of 600 steps\n", stopped);
+	Check("a body woken every frame keeps swinging with slowly tilting gravity", stopped < 20);
 	NewtonDestroy(w);
 
 	w = NewtonCreate(NULL, NULL);

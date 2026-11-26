@@ -126,11 +126,19 @@ behaviour, to keep the game's physics feel.
     geometry was shoved hard to one side: the boat lamp's rod, whose hook sits
     6.6 cm inside its ceiling beam, was held at its 30 degree cone limit.
     Shallow resting contacts are unchanged.
+12. Sleep count (Phase 6): `ndNewtonBodyDynamic::EvaluateSleepState`
+    (NewtonBody.h) lets a body with HPL1's per-body thresholds rest only
+    after it has stayed below them for `framesCount` steps in a row (HPL1
+    passes 10), as 1.53's documentation of `NewtonBodySetFreezeTreshold`
+    describes; `NewtonWorldUnfreezeBody` starts the count again. Newton 4
+    rests a body (zeroing its velocity) on the first quiet step, so the boat
+    lamp, which the wave gravity wakes every frame, stopped dead whenever
+    its slow swing slowed down.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 66 checks covering buffers, shape collision, joint readouts and
+uses it: 68 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It

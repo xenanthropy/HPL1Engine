@@ -59,10 +59,10 @@ void NewtonSetFrictionModel(const NewtonWorld*, int)
 // Bodies
 //-----------------------------------------------------------------------------
 
-// 1.53 stored speed^2 and omega^2 limits per body and ignored framesCount
-// (its own code had the frame-count logic commented out). See
-// ndNewtonBodyDynamic in NewtonBody.h for how they are applied.
-void NewtonBodySetFreezeTreshold(const NewtonBody* bodyPtr, dFloat freezeSpeedMag2, dFloat freezeOmegaMag2, int)
+// 1.53 stored speed^2 and omega^2 limits per body, and a body rested only
+// after framesCount quiet steps in a row. See ndNewtonBodyDynamic in
+// NewtonBody.h for how they are applied.
+void NewtonBodySetFreezeTreshold(const NewtonBody* bodyPtr, dFloat freezeSpeedMag2, dFloat freezeOmegaMag2, int framesCount)
 {
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBody* const body = PointerCast<ndBody, NewtonBody>(bodyPtr);
@@ -71,6 +71,7 @@ void NewtonBodySetFreezeTreshold(const NewtonBody* bodyPtr, dFloat freezeSpeedMa
 	{
 		dynBody->m_freezeSpeed2 = ndAbs(freezeSpeedMag2);
 		dynBody->m_freezeOmega2 = ndAbs(freezeOmegaMag2);
+		dynBody->m_freezeFrames = ndMax(framesCount, 0);
 	}
 }
 

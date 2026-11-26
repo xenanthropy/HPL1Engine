@@ -75,6 +75,8 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 		,m_freezeSpeed2(ndFloat32(-1.0f))
 		,m_freezeOmega2(ndFloat32(-1.0f))
 		,m_continuousCollision(0)
+		,m_freezeFrames(0)
+		,m_quietFrames(0)
 	{
 	}
 
@@ -87,7 +89,36 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 			// the stricter one.
 			freezeSpeed2 = ndMin(m_freezeSpeed2, m_freezeOmega2);
 		}
+
+		// HPL1Engine: in 1.53 (as its documentation of framesCount says) a
+		// body was put to rest only after staying below its thresholds for
+		// framesCount steps in a row, and NewtonWorldUnfreezeBody started
+		// that count again. Newton 4 rests a body (and zeroes its velocity)
+		// on the first quiet step. HPL1's wave gravity (the boat in level 1)
+		// wakes every body each frame so that slow swings keep going;
+		// without the count a hanging lamp stopped dead whenever it slowed
+		// down. A body already at rest is left alone, and the count starts
+		// again from 0 once a body is let rest, so it applies after any wake.
+		const bool resting = m_equilibrium != 0;
 		ndBodyDynamic::EvaluateSleepState(freezeSpeed2, freezeAccel2);
+		if (resting || (m_freezeFrames <= 0))
+		{
+			return;
+		}
+		if (!m_isJointFence0)
+		{
+			m_quietFrames = 0;
+		}
+		else if (m_quietFrames < m_freezeFrames)
+		{
+			m_quietFrames++;
+			m_isJointFence0 = 0;
+			m_equilibrium = 0;
+		}
+		else
+		{
+			m_quietFrames = 0;
+		}
 	}
 
 	ndFloat32 m_freezeSpeed2;
@@ -97,6 +128,11 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 	// switch, so it is only stored and reported back (HPL1 saves it in its
 	// save games and reads it back on load).
 	int m_continuousCollision;
+
+	// Steps a body must stay below its thresholds before it may rest
+	// (framesCount of NewtonBodySetFreezeTreshold), and how many it has.
+	int m_freezeFrames;
+	int m_quietFrames;
 };
 
 #endif
