@@ -96,6 +96,24 @@ class ndNewtonContactCallback : public ndContactCallback
 	{
 		m_defaultConstructor = ndSharedPtr<ndContact>(new ndNewtonContact(PointerCast<ndNewtonWorld, ndWorld>(scene->GetWorld())));
 	}
+
+	// HPL1Engine: pick the contact's material from the two bodies' 1.53
+	// material groups (NewtonBodySetMaterialGroupID). The core looks it up
+	// by the shapes' user ids instead, which the layer never sets, so every
+	// contact used the default material: no per-material friction or
+	// elasticity, and none of HPL's contact callbacks (impact sounds,
+	// breaking, damage).
+	ndMaterial* GetMaterial(const ndContact* const contact, const ndShapeInstance&, const ndShapeInstance&) const override
+	{
+		return ndContactCallback::GetMaterial(ndUnsigned32(MaterialGroup(contact->GetBody0())), ndUnsigned32(MaterialGroup(contact->GetBody1())));
+	}
+
+	static ndInt32 MaterialGroup(ndBodyKinematic* const body)
+	{
+		const ndBodyNotify* const notify = *body->GetNotifyCallback();
+		const ndNewtonBodyNotify* const newtonNotify = notify ? dynamic_cast<const ndNewtonBodyNotify*>(notify) : nullptr;
+		return newtonNotify ? newtonNotify->m_materialGoupId : 0;
+	}
 };
 
 ndNewtonWorld::ndNewtonWorld()
@@ -166,7 +184,10 @@ ndMaterial* ndNewtonWorld::GetMaterial(int id0, int id1) const
 	{
 		if ((id0 < m_bodyMaterialGroup) && (id1 < m_bodyMaterialGroup))
 		{
-			if ((id0 != 0) && (id1 != 0))
+			// HPL1Engine: also give pairs with the default group 0 their own
+			// material (HPL's "Default" material is group 0). Only 0/0 uses
+			// the shared default material. Was: both ids non-zero.
+			if ((id0 != 0) || (id1 != 0))
 			{
 				ndNewtonMaterial material;
 				notify->RegisterMaterial(material, id0, id1);
