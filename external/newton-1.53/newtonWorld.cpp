@@ -388,15 +388,10 @@ void NewtonWorldFreezeBody(const NewtonWorld* newtonWorld, const NewtonBody* bod
 {
 	TRACE_FUNCTION(__FUNCTION__);
 	// HPL1Engine: implemented (was an empty stub). Put the body at rest, the
-	// counterpart of NewtonWorldUnfreezeBody below. Its velocity is cleared
-	// so it doesn't resume moving when something wakes it. HPL1 uses this to
-	// disable bodies (e.g. doors that settle at a joint limit).
+	// counterpart of NewtonWorldUnfreezeBody below. As in the 1.53 library,
+	// it keeps its velocity and carries on with it when woken. HPL1 uses this
+	// to disable bodies (e.g. doors that settle at a joint limit).
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
-	if (body->GetInvMass() > ndFloat32(0.0f))
-	{
-		body->SetVelocityNoSleep(ndVector::m_zero);
-		body->SetOmegaNoSleep(ndVector::m_zero);
-	}
 	body->SetSleepState(true);
 }
 
@@ -417,13 +412,6 @@ void NewtonWorldUnfreezeBody(const NewtonWorld* newtonWorld, const NewtonBody* b
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 	body->SetSleepState(false);
-	// HPL1Engine: waking a body starts its quiet-step count again, as in 1.53
-	// (see ndNewtonBodyDynamic::EvaluateSleepState).
-	ndNewtonBodyDynamic* const dynBody = dynamic_cast<ndNewtonBodyDynamic*>(body);
-	if (dynBody)
-	{
-		dynBody->m_quietFrames = 0;
-	}
 }
 
 // Name: NewtonWorldRayCast 

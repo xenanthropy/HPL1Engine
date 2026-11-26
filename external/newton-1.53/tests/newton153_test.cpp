@@ -249,31 +249,47 @@ static void TestJointReadouts()
 static void TestBodies()
 {
 	Section("Bodies: sleep, impulse, freeze");
+	// Expected values below were measured with the original 1.53 library.
 	NewtonWorld* w = NewtonCreate(NULL, NULL);
 	NewtonMaterialSetDefaultFriction(w, 0, 0, 0, 0);   // frictionless floor: slow boxes slide forever
 	Box(w, 100, 1, 100, 0, 0, -0.5f, 0);
 	NewtonBody* plain = Box(w, .5f, .5f, .5f, 1, -5, 0.25f, 0);
-	NewtonBody* held = Box(w, .5f, .5f, .5f, 1, 5, 0.25f, 0);
-	NewtonBodySetAutoFreeze(plain, 1); NewtonBodySetAutoFreeze(held, 1);
-	NewtonBodySetFreezeTreshold(held, 0.01f, 0.01f, 10);   // HPL1's default
+	NewtonBody* slow = Box(w, .5f, .5f, .5f, 1, 5, 0.25f, 0);
+	NewtonBody* slower = Box(w, .5f, .5f, .5f, 1, 10, 0.25f, 0);
+	NewtonBodySetAutoFreeze(plain, 1); NewtonBodySetAutoFreeze(slow, 1); NewtonBodySetAutoFreeze(slower, 1);
+	NewtonBodySetFreezeTreshold(slow, 0.01f, 0.01f, 10);   // HPL1's default
+	NewtonBodySetFreezeTreshold(slower, 0.01f, 0.01f, 10);
 	Step(w, 30);
-	float v[3] = {0.06f, 0, 0};   // speed^2 0.0036: under HPL1's 0.01, over Newton 4's own limit
-	float fast[3] = {1, 0, 0};    // well over any freeze threshold: this check is about the
-	                              // return value; 1.53 would also rest a slow body by default
-	NewtonBodySetVelocity(plain, fast); NewtonBodySetVelocity(held, v);
-	Step(w, 60);
-	Check("NewtonBodyGetSleepingState: 1 = active (as 1.53)", NewtonBodyGetSleepingState(plain) == 1);
-	Check("per-body freeze threshold: a body under it goes to sleep (0)", NewtonBodyGetSleepingState(held) == 0);
-	NewtonBodySetVelocity(held, v);
+	Check("a box settled on the floor rests: NewtonBodyGetSleepingState 0", NewtonBodyGetSleepingState(plain) == 0);
+	float fast[3] = {1, 0, 0};
+	const float plainX = BodyX(plain);
+	NewtonBodySetVelocity(plain, fast);
 	Step(w, 5);
-	const bool awakeAfter5 = NewtonBodyGetSleepingState(held) == 1;
-	Step(w, 30);
-	Check("...but only after framesCount (10) quiet steps in a row", awakeAfter5 && NewtonBodyGetSleepingState(held) == 0);
+	Check("NewtonBodySetVelocity doesn't wake a resting body (as 1.53)",
+		NewtonBodyGetSleepingState(plain) == 0 && std::fabs(BodyX(plain) - plainX) < 1e-6f);
+	NewtonWorldUnfreezeBody(w, plain); NewtonBodySetVelocity(plain, fast);
+	Step(w, 5);
+	Check("woken and given a velocity it moves: 1 = active", NewtonBodyGetSleepingState(plain) == 1 && BodyX(plain) - plainX > 0.05f);
+	// 1.53's limits for a threshold of 0.01: speed^2 0.0022, accel^2 0.0264.
+	// framesCount isn't used: a quiet body rests on the next step, and keeps
+	// its velocity while resting.
+	float v06[3] = {0.06f, 0, 0}, v03[3] = {0.03f, 0, 0};
+	NewtonWorldUnfreezeBody(w, slow); NewtonBodySetVelocity(slow, v06);
+	NewtonWorldUnfreezeBody(w, slower); NewtonBodySetVelocity(slower, v03);
+	Step(w, 1);
+	const float slowerX = BodyX(slower);
+	Step(w, 20);
+	float vs[3]; NewtonBodyGetVelocity(slower, vs);
+	Check("0.06 m/s (speed^2 0.0036, over the limit) keeps sliding", NewtonBodyGetSleepingState(slow) == 1 && BodyX(slow) > 5.02f);
+	Check("0.03 m/s (speed^2 0.0009) rests at once whatever framesCount says",
+		NewtonBodyGetSleepingState(slower) == 0 && std::fabs(BodyX(slower) - slowerX) < 1e-6f);
+	Check("...and keeps its velocity while resting", std::fabs(vs[0] - 0.03f) < 0.002f);
 	NewtonDestroy(w);
 
 	// Penumbra's boat (cEffect_WaveGravity) tilts gravity slowly and wakes
-	// every body each frame. A lamp hanging from the ceiling must keep
-	// swinging with it, not stop dead whenever it slows down.
+	// every body each frame. Waking alone doesn't move a quiet body in 1.53,
+	// so a lamp hanging nearly still stays put until the tilt pushes it hard
+	// enough: the 1.53 library stands it still on 44 of these 600 steps.
 	w = NewtonCreate(NULL, NULL);
 	NewtonBody* lamp = Box(w, .1f, .3f, .1f, 1.1f, 0, -0.6f, 0, WaveGravity);
 	NewtonBodySetAutoFreeze(lamp, 1);
@@ -290,8 +306,8 @@ static void TestBodies()
 		if (std::fabs(BodyX(lamp) - lastX) < 1e-5f) stopped++;
 		lastX = BodyX(lamp);
 	}
-	printf("  lamp in the boat's sway: stood still on %d of 600 steps\n", stopped);
-	Check("a body woken every frame keeps swinging with slowly tilting gravity", stopped < 20);
+	printf("  lamp in the boat's sway: stood still on %d of 600 steps (1.53: 44)\n", stopped);
+	Check("a lamp woken every frame in the sway stands still about as often as in 1.53", stopped >= 30 && stopped <= 60);
 	NewtonDestroy(w);
 
 	// 1.53's NewtonBodySetMatrix keeps only the rotation: front normalised,
@@ -344,6 +360,8 @@ static void TestBodies()
 	const float x0 = BodyX(b);
 	Step(w, 10);
 	Check("...and stays put", std::fabs(BodyX(b) - x0) < 1e-6f);
+	float frozenV[3]; NewtonBodyGetVelocity(b, frozenV);
+	Check("...keeping its velocity, as 1.53 did", Length(frozenV) > 0.5f);
 	NewtonWorldUnfreezeBody(w, b);
 	NewtonAddBodyImpulse(b, dv, centre);
 	Step(w, 1);

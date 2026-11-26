@@ -126,14 +126,20 @@ behaviour, to keep the game's physics feel.
     geometry was shoved hard to one side: the boat lamp's rod, whose hook sits
     6.6 cm inside its ceiling beam, was held at its 30 degree cone limit.
     Shallow resting contacts are unchanged.
-12. Sleep count (Phase 6): `ndNewtonBodyDynamic::EvaluateSleepState`
-    (NewtonBody.h) lets a body with HPL1's per-body thresholds rest only
-    after it has stayed below them for `framesCount` steps in a row (HPL1
-    passes 10), as 1.53's documentation of `NewtonBodySetFreezeTreshold`
-    describes; `NewtonWorldUnfreezeBody` starts the count again. Newton 4
-    rests a body (zeroing its velocity) on the first quiet step, so the boat
-    lamp, which the wave gravity wakes every frame, stopped dead whenever
-    its slow swing slowed down.
+12. Sleeping as in 1.53 (Phase 6), measured against the original 1.53
+    library: `ndNewtonBodyDynamic` (NewtonBody.h) rests a body when its
+    velocity at the start of the step and its solved acceleration are under
+    limits derived from `NewtonBodySetFreezeTreshold` (speed^2 and omega^2
+    under 0.022 * max(t, 0.1), accel^2 and alpha^2 under 2.64 * max(t, 0.01);
+    1.53's default t is 0.01; `framesCount` has no effect). When its whole
+    island is quiet the body rests without taking the step and keeps its
+    velocity; Newton 4 zeroed the velocity, so the boat lamp stopped dead.
+    `NewtonWorldUnfreezeBody` only wakes a body, `NewtonBodySetVelocity` and
+    `SetOmega` don't wake a resting body but make an awake one take its next
+    step, and `NewtonWorldFreezeBody` keeps the velocity. In the core,
+    `ndDynamicsUpdate::DetermineSleepStates` calls a new virtual
+    `ndBodyKinematic::OnIslandRest` (zeroing the velocities by default)
+    instead of zeroing them itself.
 13. `NewtonBodySetMatrix` (NewtonBody.cpp) makes the rotation orthonormal
     as 1.53 did: front normalised, right = front x up (normalised), up =
     right x front, checked against the original library. HPL1 passes scaled
@@ -143,7 +149,7 @@ behaviour, to keep the game's physics feel.
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 69 checks covering buffers, shape collision, joint readouts and
+uses it: 73 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It
@@ -154,3 +160,14 @@ make newton153_test && ./HPL1Engine/external/newton-1.53/newton153_test
 ```
 
 Exit code 0 means every check passed; each check prints PASS or FAIL.
+
+The same test also builds 32-bit against the original 1.53 library
+(`libNewton.a` from the old prebuilt dependencies bundle, not in any repo),
+which is how the 1.53 behaviour it expects was measured. The original passes
+every check except the three safety nets this layer adds (world-box stop
+and the NaN guard). Test only: the game stays 64-bit.
+
+```sh
+g++ -m32 -include cstddef tests/newton153_test.cpp -I dependencies/include \
+    dependencies/lib/linux/libNewton.a -lpthread -o newton153_test_original
+```

@@ -840,6 +840,31 @@ void NewtonBodyGetTorque(const NewtonBody* bodyPtr, dFloat* vectorPtr)
 	vectorPtr[2] = vector.m_z;
 }
 
+// HPL1Engine: 1.53's NewtonBodySetVelocity/SetOmega did not wake a resting
+// body (Newton 4's SetVelocity/SetOmega do), and an awake body took the next
+// step in full even if quiet. Checked against the original 1.53 library.
+static void SetVelocityLike153(ndBodyKinematic* const body, const ndVector* const veloc, const ndVector* const omega)
+{
+	const bool resting = body->GetSleepState();
+	if (veloc)
+	{
+		body->SetVelocity(*veloc);
+	}
+	if (omega)
+	{
+		body->SetOmega(*omega);
+	}
+	if (resting)
+	{
+		body->RestoreSleepState(true);
+	}
+	ndNewtonBodyDynamic* const dynBody = dynamic_cast<ndNewtonBodyDynamic*>(body);
+	if (dynBody)
+	{
+		dynBody->m_mustStep = 1;
+	}
+}
+
 // Name: NewtonBodySetOmega 
 // Set the global angular velocity of the body.
 //
@@ -854,7 +879,7 @@ void NewtonBodySetOmega(const NewtonBody* bodyPtr, const dFloat* omega)
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 
 	const ndVector vector(omega[0], omega[1], omega[2], ndFloat32(0.0f));
-	body->SetOmega(vector);
+	SetVelocityLike153(body, NULL, &vector);
 }
 
 // Name: NewtonBodySetVelocity 
@@ -871,7 +896,7 @@ void NewtonBodySetVelocity(const NewtonBody* bodyPtr, const dFloat* velocity)
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 
 	ndVector vector(velocity[0], velocity[1], velocity[2], ndFloat32(0.0f));
-	body->SetVelocity(vector);
+	SetVelocityLike153(body, &vector, NULL);
 }
 
 // Name: NewtonBodyGetVelocity 

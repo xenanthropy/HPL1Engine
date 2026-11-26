@@ -206,6 +206,12 @@ class ndBodyKinematic : public ndBody
 	D_COLLISION_API virtual void AddDampingAcceleration(ndFloat32 timestep);
 	D_COLLISION_API virtual void SetAcceleration(const ndVector& accel, const ndVector& alpha);
 	D_COLLISION_API virtual void EvaluateSleepState(ndFloat32 freezeSpeed2, ndFloat32 freezeAccel2);
+	// HPL1Engine: called when the body's whole island comes to rest.
+	virtual void OnIslandRest()
+	{
+		m_veloc = ndVector::m_zero;
+		m_omega = ndVector::m_zero;
+	}
 	D_COLLISION_API virtual void Serialize(ndSharedPtr<ndMeshBody>& body) const override;
 
 	ndMatrix m_inertiaPrincipalAxis;

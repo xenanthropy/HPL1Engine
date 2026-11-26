@@ -13,6 +13,12 @@ Newton 4: 2.x still treats level mesh faces as two-sided thin plates with a
 depth per contact point, keeps 1.x's sleep thresholds and solver models, and
 reports joint angles the way 1.x did.
 
+**Status:** comparison only. Measured against the original 1.53 library,
+Newton 4 with the 1.53 layer is closer, so it stays the default. This core
+still has the earlier guesses about sleeping (a 10-step quiet count, waking
+on `NewtonBodySetVelocity`) that the 1.53 library disproved, and fails the
+five sleep checks written from the library's behaviour.
+
 ## Where the core comes from
 
 `core236/` is the Newton 2.36 copy in ScummVM's HPL1 port

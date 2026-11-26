@@ -1128,8 +1128,9 @@ void ndDynamicsUpdate::DetermineSleepStates()
 			body->m_equilibrium = ndUnsigned8(equilibrium & body->m_autoSleep);
 			if (body->m_equilibrium)
 			{
-				body->m_veloc = zero;
-				body->m_omega = zero;
+				// HPL1Engine: a virtual call (Newton 4 zeroed the velocities
+				// here) so the 1.53 layer's bodies can rest the 1.53 way.
+				body->OnIslandRest();
 			}
 		}
 	});
