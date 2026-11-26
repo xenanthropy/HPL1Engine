@@ -970,6 +970,17 @@ void ndBodyKinematic::IntegrateVelocity(ndFloat32 timestep)
 	ndAssert(m_omega.m_w == ndFloat32(0.0f));
 	m_globalCentreOfMass += m_veloc.Scale(timestep);
 
+	// HPL1Engine: as Newton 1.53/2.x did (dgBody::IntegrateVelocity), never
+	// turn a body more than 45 degrees in one step: shrink its angular
+	// velocity by 0.8 until it fits. Newton 4 only asserts this in debug
+	// builds, so an explicit torque that overshoots (Penumbra's grab damping
+	// on a thin object) grew without bound and threw the body away.
+	const ndFloat32 maxAngleStep = ndFloat32(45.0f) * ndDegreeToRad;
+	while (m_omega.DotProduct(m_omega).GetScalar() * timestep * timestep > maxAngleStep * maxAngleStep)
+	{
+		m_omega = m_omega.Scale(ndFloat32(0.8f));
+	}
+
 	const ndFloat32 omegaMag2 = m_omega.DotProduct(m_omega).GetScalar();
 
 #ifdef _DEBUG

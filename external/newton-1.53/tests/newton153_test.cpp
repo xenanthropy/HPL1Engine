@@ -584,6 +584,16 @@ static void PushX(const NewtonBody* b)
 	NewtonBodySetForce(b, f);
 }
 
+// Penumbra's grab damping: torque = -omega * 0.9 * mass, every step.
+static void DampSpin(const NewtonBody* b)
+{
+	float m, ix, iy, iz, om[3];
+	NewtonBodyGetMassMatrix(b, &m, &ix, &iy, &iz);
+	NewtonBodyGetOmega(b, om);
+	float t[3] = {-om[0] * 0.9f * m, -om[1] * 0.9f * m, -om[2] * 0.9f * m};
+	NewtonBodySetTorque(b, t);
+}
+
 static void TestSafety()
 {
 	Section("Safety: world box and NaN");
@@ -620,6 +630,27 @@ static void TestSafety()
 	Check("NaN velocity: position stays valid", finite && std::fabs(m[12] - 10) < 0.01f);
 	Check("NaN velocity: body is stopped", std::isfinite(v[0]) && Length(v) < 1e-3f);
 	gPushX = 0;
+	NewtonDestroy(w);
+
+	// 1.53/2.x never turn a body more than 45 degrees per step. A damping
+	// torque far too strong for a thin body's inertia (Penumbra's grab on the
+	// boat lamp) overshoots each step; without the cap the spin grows without
+	// bound and the body is thrown away.
+	w = NewtonCreate(NULL, NULL);
+	NewtonBody* thin = Box(w, 0.3f, 0.02f, 0.02f, 1, 0, 0, 0, DampSpin);
+	NewtonBodySetMassMatrix(thin, 1, 0.002f, 0.03f, 0.03f); // thin about x, like the lamp
+	float om0[3] = {1, 0, 0};
+	NewtonBodySetOmega(thin, om0);
+	float om[3], maxSpin = 0;
+	for (int i = 0; i < 120; i++)
+	{
+		NewtonUpdate(w, kStep);
+		NewtonBodyGetOmega(thin, om);
+		if (!(Length(om) <= maxSpin)) maxSpin = Length(om);
+	}
+	float pos[16]; NewtonBodyGetMatrix(thin, pos);
+	Check("overshooting damping torque: spin capped at 45 degrees per step", maxSpin < 47.2f && std::isfinite(maxSpin));
+	Check("and the body stays where it was", std::fabs(pos[12]) < 0.01f && std::fabs(pos[13]) < 0.01f);
 	NewtonDestroy(w);
 }
 

@@ -109,14 +109,21 @@ behaviour, to keep the game's physics feel.
      object flew on for ever (the boat lamp in level 1).
    - NaN guard: a body whose matrix or velocity becomes NaN/inf is put back
      at its last valid matrix and stopped, with one message on stderr.
+10. Spin cap (Phase 6): `ndBodyKinematic::IntegrateVelocity` never turns a
+    body more than 45 degrees in one step, shrinking its angular velocity by
+    0.8 until it fits, as Newton 2.x's `dgBody::IntegrateVelocity` did (and,
+    we assume, 1.53). Newton 4 only asserts this in debug builds. Without it
+    Penumbra's grab damping, which overshoots on a thin body, made the boat
+    lamp spin up without bound and fly away. Only bodies spinning faster
+    than about 47 rad/s at 60 Hz are affected.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 59 checks covering buffers, shape collision, joint readouts and
+uses it: 61 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
-the world box and NaN guard. It
+the world box, NaN guard and spin cap. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh
