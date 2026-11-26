@@ -20,6 +20,13 @@
 #define HPL_LOWLEVELGRAPHICS_SDL_H
 
 #include <GL/glew.h>
+// GLee used to pull in the platform GL headers; GLEW needs them explicitly
+// for the GLX/WGL types (Display, GLXContext, HPBUFFERARB, ...).
+#if defined(WIN32)
+#include <GL/wglew.h>
+#elif defined(__linux__)
+#include <GL/glxew.h>
+#endif
 
 #include <Cg/cg.h>
 #include <Cg/cgGL.h>

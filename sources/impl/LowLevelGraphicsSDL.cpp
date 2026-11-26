@@ -29,11 +29,6 @@
 
 #include "graphics/FontData.h"
 #include "impl/LowLevelGraphicsSDL.h"
-#if defined(WIN32)
-#include <GL/wglew.h>
-#elif defined(__linux__)
-#include <GL/glxew.h>
-#endif
 #include "impl/SDLBitmap2D.h"
 #include "impl/SDLFontData.h"
 #include "impl/SDLTexture.h"
