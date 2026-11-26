@@ -9,6 +9,9 @@
 #ifndef NEWTON_H__736495_6495_076__INCLUDED_
 #define NEWTON_H__736495_6495_076__INCLUDED_
 
+// HPL1Engine: the declarations below use size_t.
+#include <stddef.h>
+
 #define NEWTON_MAJOR_VERSION	1
 #define NEWTON_MINOR_VERSION	54
 
