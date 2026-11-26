@@ -18,6 +18,7 @@ set(HPL_DEPENDENCIES_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../dependencies"
     CACHE PATH "Folder holding the prebuilt AngelScript/Newton headers and libs")
 
 find_package(OpenGL REQUIRED)
+find_package(GLEW REQUIRED)
 find_package(SDL REQUIRED)
 find_package(SDL_image REQUIRED)
 find_package(SDL_ttf REQUIRED)
@@ -72,6 +73,7 @@ target_link_libraries(HPL
         Newton
         angelscript
         Cg::Cg
+        GLEW::GLEW
         OpenGL::GLU
         OpenGL::GL
         ${SDL_TTF_LIBRARIES}
