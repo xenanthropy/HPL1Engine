@@ -193,7 +193,10 @@ namespace hpl {
 		cInitParams.mlMinStereoSourcesHint = alMaxStereoSourceHint;
 		cInitParams.mbUseThread = abUseThreading;
 		cInitParams.mlOutputFreq = 44100;
-		cInitParams.msDeviceName = asDeviceName;
+		// HPL1Engine: the game's settings use "NULL" to mean "no particular
+		// device". Modern OpenAL (OpenAL Soft) has no device by that name, so
+		// opening it always failed; an empty name opens the default device.
+		cInitParams.msDeviceName = (asDeviceName == "NULL") ? "" : asDeviceName;
 
 		if (mbLogSounds)
 			Log("  Sound logging enabled\n");
@@ -232,10 +235,12 @@ namespace hpl {
 
 		mbInitialized = OAL_Init(cInitParams);
 
-		if (!mbInitialized)
+		if (!mbInitialized && !cInitParams.msDeviceName.empty())
 		{
-			Error("Failed to inialize Audio Trying fallback driver\n");
-			cInitParams.msDeviceName = "NULL";
+			// HPL1Engine: fall back to the default device (empty name), not to
+			// a device called "NULL", which doesn't exist.
+			Error("Failed to open audio device '%s', trying the default device\n", cInitParams.msDeviceName.c_str());
+			cInitParams.msDeviceName = "";
 			mbInitialized = OAL_Init(cInitParams);
 		}
 		if (!mbInitialized)
