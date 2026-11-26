@@ -27,8 +27,6 @@
 #endif
 
 #ifndef WIN32
-// Include FLTK
-#include "FL/fl_ask.H"
 #include <unistd.h> // symlink
 #endif
 
@@ -450,7 +448,9 @@ namespace hpl {
 		sMess += asCaption;
 		sMess +=_W("\n\n");
 		sMess += text;
-		fl_alert("%ls\n\n%ls",asCaption,text);
+		// No native message box without a GUI toolkit (this used FLTK).
+		// Print to stderr until the SDL2 port adds SDL_ShowSimpleMessageBox.
+		fprintf(stderr, "%s\n", cString::To8Char(sMess).c_str());
 		#endif
 	}
 

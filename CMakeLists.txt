@@ -77,5 +77,4 @@ target_link_libraries(HPL
         ${SDL_TTF_LIBRARIES}
         ${SDL_IMAGE_LIBRARIES}
         ${SDL_LIBRARY}
-        fltk
 )
