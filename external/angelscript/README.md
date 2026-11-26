@@ -13,7 +13,9 @@ original Penumbra Overture release shipped with.
 
 ## Local changes
 
-_None yet._
+1. `include/angelscript.h`: `asSMethodPtr<N>::Convert` returned `0` from a
+   function returning the `asUPtr` union. Old GCC never checked this
+   uninstantiated template body; GCC 13 rejects it. Now `return asUPtr();`.
 
 ## Build notes
 

@@ -781,7 +781,9 @@ struct asSMethodPtr
 		// This version of the function should never be executed, nor compiled,
 		// as it would mean that the size of the method pointer cannot be determined.
 		// int ERROR_UnsupportedMethodPtr[-1];
-		return 0;
+		// HPL1Engine: was 'return 0;', which modern GCC rejects because
+		// asUPtr is a union with no constructor taking an int.
+		return asUPtr();
 	}
 };
 
