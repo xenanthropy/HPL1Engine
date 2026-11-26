@@ -151,9 +151,14 @@ namespace hpl {
 		alLength = lLength;
 
 		char *pBuffer = hplNewArray(char,lLength);
-		fread(pBuffer, lLength, 1, pFile);
+		size_t lRead = fread(pBuffer, 1, lLength, pFile);
 
 		fclose(pFile);
+
+		if(lRead != (size_t)lLength){
+			hplDeleteArray(pBuffer);
+			return NULL;
+		}
 
 		return pBuffer;
 	}

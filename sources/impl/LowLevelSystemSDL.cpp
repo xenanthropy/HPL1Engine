@@ -501,10 +501,10 @@ namespace hpl {
 		ShellExecute ( NULL, _W("open"), asURL.c_str(), NULL, NULL, SW_SHOWNORMAL );
 		#elif defined(__linux__)
 		tString asTemp = "./openurl.sh "+cString::To8Char(asURL);
-		system(asTemp.c_str());
+		if(system(asTemp.c_str()) != 0) Warning("Couldn't open URL with '%s'\n", asTemp.c_str());
 		#elif defined(__APPLE__)
 		tString asTemp = "open "+cString::To8Char(asURL);
-		system(asTemp.c_str());
+		if(system(asTemp.c_str()) != 0) Warning("Couldn't open URL with '%s'\n", asTemp.c_str());
 		#endif
 	}
 
