@@ -44,6 +44,7 @@
 #define D_NARROW_PHASE_DIST			ndFloat32 (0.2f)
 #define D_CONTACT_TRANSLATION_ERROR	ndFloat32 (1.0e-3f)
 #define D_CONTACT_ANGULAR_ERROR		(ndFloat32 (0.25f * ndDegreeToRad))
+#define HPL1_CONTACT_CACHE			0	// HPL1Engine: see CalculateContacts
 
 ndVector ndScene::m_velocTol(ndFloat32(1.0e-16f));
 ndVector ndScene::m_angularContactError2(D_CONTACT_ANGULAR_ERROR * D_CONTACT_ANGULAR_ERROR);
@@ -525,6 +526,13 @@ void ndScene::CalculateJointContacts(ndInt32 threadIndex, ndContact* const conta
 			contact->m_maxDof = 0;
 		}
 	}
+	else
+	{
+		// HPL1Engine: the material's begin callback rejected the pair for
+		// this step, so drop its contacts, as 1.53 did. They used to stay
+		// active with the previous step's points.
+		contact->m_maxDof = 0;
+	}
 }
 
 void ndScene::ProcessContacts(ndInt32, ndInt32 contactCount, ndContactSolver* const contactSolver)
@@ -876,7 +884,12 @@ void ndScene::CalculateContacts(ndInt32 threadIndex, ndContact* const contact)
 	if (!(body0->m_equilibrium & body1->m_equilibrium))
 	{
 		bool active = contact->IsActive();
-		if (ValidateContactCache(contact, deltaTime))
+		// HPL1Engine: recompute the contacts of every moving pair each step,
+		// as 1.53 did, instead of reusing them while the bodies have moved
+		// less than 1 mm / 0.25 degrees. HPL's contact callbacks then run every
+		// step for touching bodies, and bodies HPL moves by setting their
+		// matrix (no velocity) don't keep stale contacts.
+		if (HPL1_CONTACT_CACHE && ValidateContactCache(contact, deltaTime))
 		{
 			contact->m_sceneLru = m_lru;
 			contact->m_timeOfImpact = ndFloat32(1.0e10f);
