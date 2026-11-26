@@ -128,7 +128,9 @@ ndNewtonWorld::ndNewtonWorld()
 	,m_onCreateContact(nullptr)
 	,m_onDestroyContact(nullptr)
 {
-	SetSubSteps(3);
+	// HPL1Engine: one step per NewtonUpdate, as in 1.53. With 3 substeps
+	// every contact and joint callback also ran 3 times per update.
+	SetSubSteps(1);
 	// HPL1Engine: single-threaded, on the caller's thread (see
 	// D_USE_THREAD_EMULATION in CMakeLists.txt). Was: the default.
 	SetThreadCount(1);
