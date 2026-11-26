@@ -267,9 +267,54 @@ NewtonJoint* NewtonConstraintCreateBall(const NewtonWorld* const newtonWorld,
 // See also: NewtonConstraintCreateBall
 void NewtonBallSetConeLimits(const NewtonJoint* joint, const dFloat* pin, dFloat maxConeAngle, dFloat maxTwistAngle)
 {
+	// HPL1Engine: follow 1.53 (code from 2.36's NewtonBallSetConeLimits and
+	// dgBallConstraint::SetLimits). The layer ignored *pin*, so the cone was
+	// centred on whatever axis the joint got at creation (pivot minus body
+	// position) instead of the axis HPL1 asks for. Now the joint frame is
+	// re-aimed so its front axis is the cone axis, at the current pivot, and
+	// the enable thresholds and clamps match 1.53.
 	NewtonBallAndSockect* const userJoint = PointerCast<NewtonBallAndSockect, NewtonJoint>(joint);
-	userJoint->SetConeLimitState((ndAbs(maxConeAngle) > ndFloat32(1.0e-2f)) ? true : false);
-	userJoint->SetConeLimit(maxConeAngle);
-	userJoint->SetTwistLimitState((ndAbs(maxTwistAngle) > ndFloat32(1.0e-2f)) ? true : false);
-	userJoint->SetTwistLimits(-maxTwistAngle, maxTwistAngle);
+
+	ndVector coneAxis(pin[0], pin[1], pin[2], ndFloat32(0.0f));
+	if (coneAxis.DotProduct(coneAxis).GetScalar() < ndFloat32(1.0e-3f))
+	{
+		coneAxis = ndVector(ndFloat32(1.0f), ndFloat32(0.0f), ndFloat32(0.0f), ndFloat32(0.0f));
+	}
+	coneAxis = coneAxis.Normalize();
+	ndVector tmp(ndFloat32(1.0f), ndFloat32(0.0f), ndFloat32(0.0f), ndFloat32(0.0f));
+	if (ndAbs(tmp.DotProduct(coneAxis).GetScalar()) > ndFloat32(0.999f))
+	{
+		tmp = ndVector(ndFloat32(0.0f), ndFloat32(1.0f), ndFloat32(0.0f), ndFloat32(0.0f));
+		if (ndAbs(tmp.DotProduct(coneAxis).GetScalar()) > ndFloat32(0.999f))
+		{
+			tmp = ndVector(ndFloat32(0.0f), ndFloat32(0.0f), ndFloat32(1.0f), ndFloat32(0.0f));
+		}
+	}
+	const ndVector bilateral(tmp.CrossProduct(coneAxis).Normalize());
+	const ndVector lateral(bilateral.CrossProduct(coneAxis).Normalize());
+
+	ndMatrix matrix0;
+	ndMatrix matrix1;
+	userJoint->CalculateGlobalMatrix(matrix0, matrix1);
+	ndMatrix frame(ndGetIdentityMatrix());
+	frame.m_front = coneAxis;
+	frame.m_up = lateral;
+	frame.m_right = coneAxis.CrossProduct(lateral);
+	frame.m_posit = matrix1.m_posit;
+	frame.m_posit.m_w = ndFloat32(1.0f);
+	ndMatrix localMatrix0;
+	ndMatrix localMatrix1;
+	userJoint->CalculateLocalMatrix(frame, localMatrix0, localMatrix1);
+	userJoint->SetLocalMatrix0(localMatrix0);
+	userJoint->SetLocalMatrix1(localMatrix1);
+
+	const ndFloat32 oneDegree = ndFloat32(ndDegreeToRad);
+	maxConeAngle = ndAbs(maxConeAngle);
+	maxTwistAngle = ndAbs(maxTwistAngle);
+	userJoint->SetConeLimitState(maxConeAngle > oneDegree);
+	userJoint->SetTwistLimitState(maxTwistAngle > oneDegree);
+	const ndFloat32 coneAngle = ndClamp(maxConeAngle, ndFloat32(5.0f) * oneDegree, ndFloat32(175.0f) * oneDegree);
+	const ndFloat32 twistAngle = ndClamp(maxTwistAngle, ndFloat32(5.0f) * oneDegree, ndFloat32(90.0f) * oneDegree);
+	userJoint->SetConeLimit(coneAngle);
+	userJoint->SetTwistLimits(-twistAngle, twistAngle);
 }
