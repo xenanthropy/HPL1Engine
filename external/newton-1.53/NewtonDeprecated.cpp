@@ -23,12 +23,15 @@
 #include "Newton.h"
 #include "NewtonBody.h"
 #include "joints/NewtonJoints.h"
+#include "newtonWorld.h"
 
 void NewtonSetWorldSize(const NewtonWorld* newtonWorld, const dFloat* minPoint, const dFloat* maxPoint)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	//do nothing;
-	ndTrace(("deprecated: there not world bounds in newton 4\n"));
+	// HPL1Engine: Newton 4 has no world bounds, so the layer keeps 1.53's
+	// box itself (see ndNewtonWorld::GuardBodies). Was: ignored.
+	ndNewtonWorld* const world = PointerCast<ndNewtonWorld, NewtonWorld>(newtonWorld);
+	world->SetWorldSize(ndVector(minPoint[0], minPoint[1], minPoint[2], 1.0f), ndVector(maxPoint[0], maxPoint[1], maxPoint[2], 1.0f));
 }
 
 void NewtonSetMinimumFrameRate(const NewtonWorld* newtonWorld, dFloat frameRate)

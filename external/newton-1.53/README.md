@@ -101,13 +101,22 @@ behaviour, to keep the game's physics feel.
      `NewtonJointSetStiffness` stores the value (default 0.9, as in 1.53)
      so it can be read back; it has no effect on Newton 4.
    - `Newton.h` includes `<stddef.h>` for `size_t`.
+9. Safety (Phase 6): `ndNewtonWorld::GuardBodies`, run after each update.
+   - 1.53's world box. `NewtonSetWorldSize` was ignored; the layer now keeps
+     the box (default +-100, as at 1.53 world creation) and, as 1.53 did,
+     disables a body whose bounding box leaves it: velocity zeroed and put to
+     sleep, again each update while it stays outside. Without it, a thrown
+     object flew on for ever (the boat lamp in level 1).
+   - NaN guard: a body whose matrix or velocity becomes NaN/inf is put back
+     at its last valid matrix and stopped, with one message on stderr.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 53 checks covering buffers, shape collision, joint readouts and
+uses it: 59 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
-limit callbacks, materials and contact callbacks, and joint utilities. It
+limit callbacks, materials and contact callbacks, joint utilities, and
+the world box and NaN guard. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh

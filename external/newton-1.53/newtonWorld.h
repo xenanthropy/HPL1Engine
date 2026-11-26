@@ -54,6 +54,16 @@ class ndNewtonWorld: public ndWorld
 
 	void SetContactCallback();
 
+	// HPL1Engine: Newton 1.53's world box. A body whose bounding box leaves it
+	// is disabled (stopped and put to sleep), as 1.53 did. Default +-100, as
+	// at 1.53 world creation; NewtonSetWorldSize changes it.
+	void SetWorldSize(const ndVector& minBox, const ndVector& maxBox);
+	// HPL1Engine: stops bodies that left the world box, and bodies whose
+	// matrix or velocity became NaN/inf (restored to their last good matrix).
+	void GuardBodies();
+	ndVector m_worldMin;
+	ndVector m_worldMax;
+
 	ndWeakPtr<void> m_userData;
 	ndInt32 m_bodyMaterialGroup;
 

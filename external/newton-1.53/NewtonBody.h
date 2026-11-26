@@ -50,6 +50,10 @@ class ndNewtonBodyNotify : public ndModelBodyNotify
 	ndFloat32 m_capOmega;
 
 	bool m_bodyIsInWorld;
+	// HPL1Engine: for ndNewtonWorld::GuardBodies.
+	ndMatrix m_lastGoodMatrix;
+	bool m_hasLastGoodMatrix;
+	bool m_nonFiniteReported;
 	bool m_collideWithConnectedBodies;
 
 	NewtonBodyDestructor m_onDestroy;

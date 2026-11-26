@@ -571,6 +571,58 @@ static void TestJointUtilities()
 
 //-----------------------------------------------------------------------------
 
+//-----------------------------------------------------------------------------
+// 9. Safety: 1.53's world box, and bodies whose state becomes NaN.
+//-----------------------------------------------------------------------------
+
+static float gPushX = 0;
+static void PushX(const NewtonBody* b)
+{
+	float m, ix, iy, iz;
+	NewtonBodyGetMassMatrix(b, &m, &ix, &iy, &iz);
+	float f[3] = {gPushX * m, 0, 0};
+	NewtonBodySetForce(b, f);
+}
+
+static void TestSafety()
+{
+	Section("Safety: world box and NaN");
+	NewtonWorld* w = NewtonCreate(NULL, NULL);
+	float mn[3] = {-20, -20, -20}, mx[3] = {20, 20, 20};
+	NewtonSetWorldSize(w, mn, mx);
+
+	// A body pushed hard stops at the edge of the box (1.53: "automatically
+	// disabled"), instead of flying on for ever.
+	gPushX = 500;
+	NewtonBody* flier = Box(w, 1, 1, 1, 1, 0, 0, 0, PushX);
+	Step(w, 600);
+	float v[3]; NewtonBodyGetVelocity(flier, v);
+	Check("body leaving the world box stops near its edge", BodyX(flier) < 25 && BodyX(flier) > 19);
+	Check("and is left with no velocity", Length(v) < 1e-3f);
+	Step(w, 60);
+	Check("and stays there", BodyX(flier) < 25);
+
+	// A body inside the box is untouched (falls freely for 1 s: ~4.9 m).
+	NewtonBody* faller = Box(w, 1, 1, 1, 1, -10, 10, 0);
+	Step(w, 60);
+	Check("body inside the box moves normally", BodyY(faller) < 6 && BodyY(faller) > 4.5f);
+
+	// NaN velocity: the body goes back to its last valid position and stops.
+	NewtonBody* bad = Box(w, 1, 1, 1, 1, 10, 0, 0, NoForce);
+	Step(w, 2);
+	float nanv[3] = {std::nanf(""), 0, 0};
+	NewtonBodySetVelocity(bad, nanv);
+	Step(w, 3);
+	float m[16]; NewtonBodyGetMatrix(bad, m);
+	NewtonBodyGetVelocity(bad, v);
+	bool finite = true;
+	for (int i = 0; i < 16; i++) if (!std::isfinite(m[i])) finite = false;
+	Check("NaN velocity: position stays valid", finite && std::fabs(m[12] - 10) < 0.01f);
+	Check("NaN velocity: body is stopped", std::isfinite(v[0]) && Length(v) < 1e-3f);
+	gPushX = 0;
+	NewtonDestroy(w);
+}
+
 int main()
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -583,6 +635,7 @@ int main()
 	TestLimitCallbacks();
 	TestMaterials();
 	TestJointUtilities();
+	TestSafety();
 	printf("\n%d of %d checks passed%s\n", gChecks - gFailures, gChecks, gFailures ? "" : ": all good");
 	return gFailures ? 1 : 0;
 }

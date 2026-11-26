@@ -10,6 +10,8 @@
 */
 
 #include "newtonStdafx.h"
+#include <cmath>
+#include <cstdio>
 #include "Newton.h"
 #include "NewtonBody.h"
 #include "NewtonUtils.h"
@@ -140,6 +142,76 @@ ndNewtonWorld::ndNewtonWorld()
 	// and with one thread and scalar maths it gains nothing.
 	SelectSolver(ndStandardSolver);
 	SetContactCallback();
+	SetWorldSize(ndVector(-100.0f, -100.0f, -100.0f, 1.0f), ndVector(100.0f, 100.0f, 100.0f, 1.0f));
+}
+
+void ndNewtonWorld::SetWorldSize(const ndVector& minBox, const ndVector& maxBox)
+{
+	m_worldMin = minBox.GetMin(maxBox);
+	m_worldMax = minBox.GetMax(maxBox);
+}
+
+static bool IsFiniteVector(const ndVector& v)
+{
+	return std::isfinite(v.m_x) && std::isfinite(v.m_y) && std::isfinite(v.m_z);
+}
+
+void ndNewtonWorld::GuardBodies()
+{
+	const ndBodyListView& bodies = GetBodyList();
+	for (ndBodyListView::ndNode* node = bodies.GetFirst(); node; node = node->GetNext())
+	{
+		ndBodyKinematic* const body = node->GetInfo()->GetAsBodyKinematic();
+		if (!body || (body->GetInvMass() <= ndFloat32(0.0f)))
+		{
+			continue;
+		}
+		ndNewtonBodyNotify* const notify = dynamic_cast<ndNewtonBodyNotify*>(*body->GetNotifyCallback());
+		if (!notify)
+		{
+			continue;
+		}
+
+		const ndMatrix& matrix = body->GetMatrix();
+		const bool finite = IsFiniteVector(matrix.m_front) && IsFiniteVector(matrix.m_up) &&
+			IsFiniteVector(matrix.m_right) && IsFiniteVector(matrix.m_posit) &&
+			IsFiniteVector(body->GetVelocity()) && IsFiniteVector(body->GetOmega());
+		if (!finite)
+		{
+			// NaN/inf would spread to every body and joint touching it and on
+			// into the game. Put the body back where it last was valid and stop it.
+			if (!notify->m_nonFiniteReported)
+			{
+				fprintf(stderr, "Newton: a body's position or velocity became NaN/inf; restoring its last valid position and stopping it.\n");
+				notify->m_nonFiniteReported = true;
+			}
+			const ndMatrix restore(notify->m_hasLastGoodMatrix ? notify->m_lastGoodMatrix : ndGetIdentityMatrix());
+			body->SetMatrix(restore);
+			body->SetVelocity(ndVector::m_zero);
+			body->SetOmega(ndVector::m_zero);
+			body->SetSleepState(true);
+			notify->OnTransform(0.0f, restore);
+			continue;
+		}
+		notify->m_lastGoodMatrix = matrix;
+		notify->m_hasLastGoodMatrix = true;
+
+		ndVector p0;
+		ndVector p1;
+		body->GetAABB(p0, p1);
+		const bool inside =
+			(p0.m_x >= m_worldMin.m_x) && (p0.m_y >= m_worldMin.m_y) && (p0.m_z >= m_worldMin.m_z) &&
+			(p1.m_x <= m_worldMax.m_x) && (p1.m_y <= m_worldMax.m_y) && (p1.m_z <= m_worldMax.m_z);
+		if (!inside)
+		{
+			// 1.53: "When a body moves outside the bounding box that defines the
+			// world space the body is automatically disabled." Kept disabled
+			// for as long as it stays outside.
+			body->SetVelocity(ndVector::m_zero);
+			body->SetOmega(ndVector::m_zero);
+			body->SetSleepState(true);
+		}
+	}
 }
 
 ndNewtonWorld::~ndNewtonWorld()
@@ -207,6 +279,7 @@ ndMaterial* ndNewtonWorld::GetMaterial(int id0, int id1) const
 
 void ndNewtonWorld::PostUpdate(ndFloat32 timestep)
 {
+	GuardBodies();
 	if (m_onPostUpdate)
 	{
 		m_onPostUpdate(PointerCast<NewtonWorld, ndNewtonWorld>(this), timestep);
