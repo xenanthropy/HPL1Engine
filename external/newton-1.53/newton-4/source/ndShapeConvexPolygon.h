@@ -85,6 +85,8 @@ class ndShapeConvexPolygon: public ndShapeConvex
 	ndFloat32 m_faceClipSize;
 	ndInt32 m_faceId;
 	ndInt32 m_faceNormalIndex;
+	// HPL1Engine: build the face without skirts (Newton 1.53's thin plate).
+	bool m_hplThinPlate;
 
 	const ndShapeInstance* m_owner;
 	const ndVector* m_vertexArray;

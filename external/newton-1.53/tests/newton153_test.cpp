@@ -848,6 +848,22 @@ static void TestLevelMesh()
 	}
 	Check("body 7.5 mm inside the floor is not pushed out", std::fabs(pushed[0]) < 0.001f);
 	Check("body 2 cm inside the floor is pushed out at about 0.012 m/s", pushed[1] > 0.009f && pushed[1] < 0.015f);
+
+	// The rod tilted 10 degrees, so its top pokes out of the beam's -z side
+	// and its centre is in front of that face. The shortest way off that
+	// face is through it, so 1.53 makes no contact with it and the rod
+	// stays still. Newton 4 alone pushed it out sideways at 0.04 m/s.
+	w = NewtonCreate(NULL, NULL);
+	BuildLevel(w);
+	rod = Box(w, 0.052168f, 0.847362f, 0.053070f, 1.1f, 0, 0, 0, NoForce);
+	const float tilt = 10 * 3.14159265f / 180;
+	const float c = std::cos(tilt), s = std::sin(tilt);
+	const float tilted[16] = {1,0,0,0, 0,c,s,0, 0,-s,c,0, 0,2.397f - 0.393f*c,-0.393f*s,1};
+	NewtonBodySetMatrix(rod, tilted);
+	NewtonUpdate(w, kStep);
+	NewtonBodyGetVelocity(rod, v);
+	Check("bar poking out of a beam's side is not pushed sideways", Length(v) < 0.002f);
+	NewtonDestroy(w);
 }
 
 int main()

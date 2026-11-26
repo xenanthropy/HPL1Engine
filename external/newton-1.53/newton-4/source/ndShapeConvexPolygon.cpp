@@ -29,11 +29,15 @@
 
 //#define D_CONVEX_POLYGON_SKIRT_LENGTH ndFloat32 (0.025f)
 #define D_CONVEX_POLYGON_SKIRT_LENGTH ndFloat32 (0.25f)
+// HPL1Engine: 1.53 drops a face whose separating direction is within about
+// 85 degrees of the face plane (measured: cos between 0.07 and 0.10).
+#define D_HPL_THIN_PLATE_MIN_COS ndFloat32 (0.09f)
 
 ndShapeConvexPolygon::ndShapeConvexPolygon ()
 	:ndShapeConvex(m_polygonCollision)
 	,m_faceClipSize(0)
 	,m_faceNormalIndex(0)
+	,m_hplThinPlate(false)
 	,m_vertexArray(nullptr)
 	,m_vertexIndex(nullptr)
 {
@@ -95,7 +99,8 @@ void ndShapeConvexPolygon::GenerateConvexCap()
 	m_adjancentEdge.SetCount(0);
 	for (ndInt32 i = 0; i < count; ++i)
 	{
-		if (m_adjacentFaceEdgeNormalIndex[i0] > 0)
+		// HPL1Engine: no skirts for a thin plate (see CalculateContactToConvexHullDescrete).
+		if (!m_hplThinPlate && (m_adjacentFaceEdgeNormalIndex[i0] > 0))
 		{
 			const ndVector faceEddge(m_localPoly[i] - m_localPoly[i0]);
 			ndAssert(faceEddge.m_w == ndFloat32(0.0f));
@@ -512,18 +517,10 @@ ndInt32 ndShapeConvexPolygon::CalculateContactToConvexHullDescrete(ndContactSolv
 	ndAssert(contactSolver.m_instance0.GetShape()->GetAsShapeConvex());
 	ndAssert(contactSolver.m_instance1.GetShape()->GetAsShapeConvexPolygon());
 	ndAssert(contactSolver.m_instance1.GetGlobalMatrix().TestIdentity());
-	ndAssert(contactSolver.m_instance1.GetGlobalMatrix().TestIdentity());
 
 	const ndMatrix& hullMatrix = contactSolver.m_instance0.m_globalMatrix;
 	const ndShapeInstance* const hull = &contactSolver.m_instance0;
-
 	ndAssert(m_normal.m_w == ndFloat32(0.0f));
-	const ndVector obbOrigin(hullMatrix.TransformVector(contactSolver.m_instance0.GetShape()->GetObbOrigin()));
-	const ndFloat32 shapeSide = m_normal.DotProduct(obbOrigin - m_localPoly[0]).GetScalar();
-	if (shapeSide < ndFloat32(0.0f))
-	{
-		return 0;
-	}
 
 	const ndVector normalInHull(hullMatrix.UnrotateVector(m_normal));
 	const ndVector pointInHull(hull->SupportVertex(normalInHull.Scale(ndFloat32(-1.0f))));
@@ -540,84 +537,24 @@ ndInt32 ndShapeConvexPolygon::CalculateContactToConvexHullDescrete(ndContactSolv
 	}
 
 	const ndVector p1(hullMatrix.TransformVector(hull->SupportVertex(normalInHull)));
-
 	ndFloat32 distance = m_normal.DotProduct(m_localPoly[0] - p1).GetScalar();
 	if (distance >= ndFloat32(0.0f))
 	{
 		return 0;
 	}
 
-	// HPL1Engine: Newton 2.x (and, we assume, 1.53) treats a mesh face as a
-	// thin plate and pushes a penetrating body out along the shortest way off
-	// it (EPA). When the shortest way is sideways, across one of the face's
-	// edges, rather than along the face normal, it makes no contact with that
-	// face. Newton 4
-	// always pushes out along the face normal, so a body that starts partly
-	// buried in level geometry (the boat lamp's rod hook in its ceiling
-	// beam) got shoved hard to one side. Do as 2.x: skip the face when the
-	// body could leave it sideways in less than its depth along the normal.
-	// Resting contacts are only a few mm deep, so they keep their face
-	// unless the body overhangs the face's edge by less than that.
-	{
-		const ndFloat32 depth = m_normal.DotProduct(m_localPoly[0] - p0).GetScalar();
-		if (depth > ndFloat32(0.0f))
-		{
-			const ndInt32 count = m_localPoly.GetCount();
-			ndInt32 j0 = count - 1;
-			for (ndInt32 j = 0; j < count; ++j)
-			{
-				const ndVector edge(m_localPoly[j] - m_localPoly[j0]);
-				ndVector inward(m_normal.CrossProduct(edge) & ndVector::m_triplexMask);
-				const ndFloat32 mag2 = inward.DotProduct(inward).GetScalar();
-				if (mag2 > ndFloat32(1.0e-12f))
-				{
-					inward = inward.Scale(ndFloat32(1.0f) / ndSqrt(mag2));
-					const ndVector support(hullMatrix.TransformVector(hull->SupportVertex(hullMatrix.UnrotateVector(inward))));
-					const ndFloat32 sideways = inward.DotProduct(support - m_localPoly[j0]).GetScalar();
-					if (sideways < depth)
-					{
-						return 0;
-					}
-				}
-				j0 = j;
-			}
-		}
-	}
-
-	ndVector boxSize;
-	ndVector boxOrigin;
-	hull->CalculateObb(boxOrigin, boxSize);
-	ndAssert(boxOrigin.m_w == ndFloat32(0.0f));
-	boxOrigin += ndVector::m_wOne;
-
-	bool inside = true;
-	const ndInt32 vertexCount = m_localPoly.GetCount();
-	ndInt32 i0 = vertexCount - 1;
-	for (ndInt32 i = 0; i < vertexCount; ++i)
-	{
-		ndVector e(m_localPoly[i] - m_localPoly[i0]);
-		ndVector edgeBoundaryNormal(m_normal.CrossProduct(e));
-		ndAssert(edgeBoundaryNormal.m_w == ndFloat32(0.0f));
-		ndPlane plane(edgeBoundaryNormal, -m_localPoly[i0].DotProduct(edgeBoundaryNormal).GetScalar());
-		plane = hullMatrix.UntransformPlane(plane);
-
-		ndFloat32 supportDist = boxSize.DotProduct(plane.Abs()).GetScalar();
-		ndFloat32 centerDist = plane.DotProduct(boxOrigin).GetScalar();
-
-		if ((centerDist + supportDist) < ndFloat32(0.0f))
-		{
-			return 0;
-		}
-
-		if ((centerDist - supportDist) < ndFloat32(0.0f))
-		{
-			inside = false;
-			break;
-		}
-		i0 = i;
-	}
-
+	// HPL1Engine: collide with a level face the way Newton 1.53 did,
+	// measured against the original library. 1.53 treats each face as a
+	// plate with no thickness and no skirt: the contact normal is the
+	// shortest way to separate the body from that plate, whichever side of
+	// it the body's centre is on. When that way is through the face, or
+	// (nearly) along it, 1.53 makes no contact with the face at all; a body
+	// that pokes into level geometry from the side is then held only by
+	// the faces it really rests on. Newton 4 instead culls faces by the
+	// body's centre and otherwise pushes along the face normal, which
+	// shoved the boat lamp's rod out of the side of its ceiling beam.
 	bool needSkirts = true;
+	m_hplThinPlate = true;
 	ndFloat32 convexSphapeUmbra = hull->GetUmbraClipSize();
 	if (m_faceClipSize > convexSphapeUmbra)
 	{
@@ -628,56 +565,33 @@ ndInt32 ndShapeConvexPolygon::CalculateContactToConvexHullDescrete(ndContactSolv
 
 		if (!BeamClipping(origin, convexSphapeUmbra))
 		{
+			m_hplThinPlate = false;
 			return 0;
 		}
 		needSkirts = false;
 		m_faceClipSize = hull->GetShape()->GetBoxMaxRadius();
 	}
-
-	ndInt32 count = 0;
-	const ndUnsigned64 hullId = hull->GetUserDataID();
-	if (inside && !contactSolver.m_intersectionTestOnly)
+	if (needSkirts)
 	{
-		contactSolver.m_separationDistance = -penetration;
-		contactSolver.m_separatingVector = m_normal;
-		contactSolver.m_closestPoint0 = p0;
-		contactSolver.m_closestPoint1 = p0 + m_normal.Scale(penetration);
+		GenerateConvexCap();
+	}
+	m_hplThinPlate = false;
+	m_vertexCount = ndUnsigned16(m_localPoly.GetCount());
 
-		penetration = ndMax(ndFloat32(0.0f), penetration);
-		ndAssert(penetration >= ndFloat32(0.0f));
-		ndVector contactPoints[128];
-		ndVector point(pointInHull + normalInHull.Scale(penetration - D_PENETRATION_TOL));
-
-		count = hull->CalculatePlaneIntersection(normalInHull.Scale(ndFloat32(-1.0f)), point, contactPoints);
-		ndVector step(normalInHull.Scale((contactSolver.m_skinMargin - penetration) * ndFloat32(0.5f)));
-
+	ndInt32 count = contactSolver.ConvexToConvexContactsDiscrete();
+	ndAssert(contactSolver.m_intersectionTestOnly || (count >= 0));
+	if (count >= 1)
+	{
 		ndContactPoint* const contactsOut = contactSolver.m_contactBuffer;
+		if (!contactSolver.m_intersectionTestOnly && (contactsOut[0].m_normal.DotProduct(m_normal).GetScalar() < D_HPL_THIN_PLATE_MIN_COS))
+		{
+			return 0;
+		}
+		const ndUnsigned64 hullId = hull->GetUserDataID();
 		for (ndInt32 i = 0; i < count; ++i)
 		{
-			contactsOut[i].m_point = hullMatrix.TransformVector(contactPoints[i] + step);
-			contactsOut[i].m_normal = m_normal;
 			contactsOut[i].m_shapeId0 = ndInt64(hullId);
 			contactsOut[i].m_shapeId1 = m_faceId;
-			contactsOut[i].m_penetration = penetration;
-		}
-	}
-	else
-	{
-		if (needSkirts)
-		{
-			GenerateConvexCap();
-		}
-		m_vertexCount = ndUnsigned16(vertexCount);
-		count = contactSolver.ConvexToConvexContactsDiscrete();
-		ndAssert(contactSolver.m_intersectionTestOnly || (count >= 0));
-		if (count >= 1)
-		{
-			ndContactPoint* const contactsOut = contactSolver.m_contactBuffer;
-			for (ndInt32 i = 0; i < count; ++i)
-			{
-				contactsOut[i].m_shapeId0 = ndInt64(hullId);
-				contactsOut[i].m_shapeId1 = m_faceId;
-			}
 		}
 	}
 	return count;

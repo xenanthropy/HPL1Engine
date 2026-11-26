@@ -116,16 +116,21 @@ behaviour, to keep the game's physics feel.
     Penumbra's grab damping, which overshoots on a thin body, made the boat
     lamp spin up without bound and fly away. Only bodies spinning faster
     than about 47 rad/s at 60 Hz are affected.
-11. Level mesh faces (Phase 6): `ndShapeConvexPolygon::CalculateContactToConvexHullDescrete`
-    skips a mesh face when a penetrating body could leave it sideways, across
-    one of its edges, in less than its depth along the face normal. Newton
-    2.x (checked against ScummVM's 2.36; we assume 1.53 too) treats a face as
-    a thin plate and pushes out along the shortest way (EPA); when that way is
-    sideways it makes no contact. Newton 4 always
-    pushed along the normal, so a body starting partly buried in level
-    geometry was shoved hard to one side: the boat lamp's rod, whose hook sits
-    6.6 cm inside its ceiling beam, was held at its 30 degree cone limit.
-    Shallow resting contacts are unchanged.
+11. Level mesh faces as 1.53 (Phase 6), measured against the original 1.53
+    library: `ndShapeConvexPolygon::CalculateContactToConvexHullDescrete`
+    treats each face as a plate with no thickness and no skirt and always
+    runs the convex-convex test against it (GJK/EPA). The contact normal is
+    the shortest way off that plate, whichever side the body's centre is on;
+    when it points through the face or within about 85 degrees of the face
+    plane (normal . face normal < 0.09), the face makes no contact. Newton 4
+    culled faces by the body's centre and otherwise pushed along the face
+    normal, so the boat lamp's rod, whose hook pokes 4 mm out of the side of
+    its ceiling beam, was shoved sideways to its 30 degree cone limit. On
+    about 1,100 random box poses against a face, the layer now agrees with
+    1.53 on whether there is a contact 99% of the time (82% before), and
+    where both touch the median normal is the same. This replaces an earlier
+    guess that skipped a face when the body could leave it sideways across
+    an edge.
 12. Sleeping as in 1.53 (Phase 6), measured against the original 1.53
     library: `ndNewtonBodyDynamic` (NewtonBody.h) rests a body when its
     velocity at the start of the step and its solved acceleration are under
@@ -145,7 +150,6 @@ behaviour, to keep the game's physics feel.
     right x front, checked against the original library. HPL1 passes scaled
     matrices for map nodes that carry a scale; kept as given, the boat
     cabin's notebook was shrunk to a few millimetres.
-
 14. Push-out of overlapping bodies (`ndContact::JacobianContactDerivative`),
     measured against the original 1.53 library: no push below 1/128 m of
     overlap, then 10 * softness (1.0 m/s per metre for the default 0.1)
@@ -156,7 +160,7 @@ behaviour, to keep the game's physics feel.
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 75 checks covering buffers, shape collision, joint readouts and
+uses it: 76 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It
