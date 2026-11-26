@@ -599,7 +599,10 @@ void NewtonConvexHullModifierGetMatrix(const NewtonCollision* convexHullModifier
 	TRACE_FUNCTION(__FUNCTION__);
 	ndShapeInstance* const instance = PointerCast<ndShapeInstance, NewtonCollision>(convexHullModifier);
 	ndMatrix matrix(instance->GetLocalMatrix());
-	ndMemCpy(matrixPtr, &matrix[0][0], sizeof(ndMatrix) / sizeof(ndFloat32));
+	// HPL1Engine: copy exactly 16 floats. On GCC/Clang sizeof(ndMatrix) is 96, not 64
+	// (empty-base layout rules put m_front at offset 16), so the old count of
+	// sizeof(ndMatrix)/sizeof(ndFloat32) = 24 overran the 16-float buffer.
+	ndMemCpy(matrixPtr, &matrix[0][0], 16);
 }
 
 // Name: NewtonConvexHullModifierSetMatrix

@@ -116,7 +116,10 @@ inline ndMatrix::ndMatrix ()
 
 inline ndMatrix::ndMatrix (const ndFloat32* const array)
 {
-	ndMemCpy(&m_front.m_x, array, sizeof(ndMatrix) / sizeof (ndFloat32));
+	// HPL1Engine: copy exactly 16 floats. On GCC/Clang sizeof(ndMatrix) is 96, not 64
+	// (empty-base layout rules put m_front at offset 16), so the old count of
+	// sizeof(ndMatrix)/sizeof(ndFloat32) = 24 overran the 16-float buffer.
+	ndMemCpy(&m_front.m_x, array, 16);
 }
 
 inline ndMatrix::ndMatrix (const ndVector &front, const ndVector &up, const ndVector &right, const ndVector &posit)

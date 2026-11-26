@@ -579,7 +579,10 @@ void NewtonBodyGetMatrix(const NewtonBody* bodyPtr, dFloat* matrixPtr)
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBody* const body = PointerCast<ndBody, NewtonBody>(bodyPtr);
 	const ndMatrix matrix(body->GetMatrix());
-	ndMemCpy(matrixPtr, &matrix[0][0], sizeof(ndMatrix) / sizeof(ndFloat32));
+	// HPL1Engine: copy exactly 16 floats. On GCC/Clang sizeof(ndMatrix) is 96, not 64
+	// (empty-base layout rules put m_front at offset 16), so the old count of
+	// sizeof(ndMatrix)/sizeof(ndFloat32) = 24 overran the 16-float buffer.
+	ndMemCpy(matrixPtr, &matrix[0][0], 16);
 }
 
 void NewtonBodySetFullMassMatrix(const NewtonBody* const bodyPtr, dFloat mass, const dFloat* const inertiaMatrix)
