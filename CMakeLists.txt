@@ -42,6 +42,11 @@ add_library(Newton STATIC IMPORTED)
 set_target_properties(Newton PROPERTIES
     IMPORTED_LOCATION ${HPL_DEPENDENCIES_DIR}/lib/linux/libNewton.a)
 
+# Newton 1.53 compatibility layer, built from the vendored source. Not linked
+# into HPL yet (Phase 5 in progress); build it on its own with the
+# "newton153" target.
+add_subdirectory(external/newton-1.53 EXCLUDE_FROM_ALL)
+
 # AngelScript 2.7.1b, built from the vendored source.
 add_subdirectory(external/angelscript)
 
