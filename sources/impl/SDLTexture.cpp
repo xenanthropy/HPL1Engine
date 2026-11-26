@@ -574,7 +574,7 @@ namespace hpl {
 		}
 
 		//For some reason checking for ARB texture is not working on radeon cards.
-		/*if(mTarget == eTextureTarget_Rect && !GLEE_ARB_texture_rectangle)
+		/*if(mTarget == eTextureTarget_Rect && !GLEW_ARB_texture_rectangle)
 		{
 		Error("Rectangle texture target not supported\n");
 		return false;
