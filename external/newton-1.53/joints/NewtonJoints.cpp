@@ -45,7 +45,9 @@ NewtonJointUserData* NewtonJointUserData::GetUserData(const NewtonJoint* const j
 	ndSharedPtr<ndJointUserData>* userData = joint->GetUserData();
 	if (!(*userData))
 	{
-		joint->SetUserData(ndSharedPtr<ndJointUserData>(new NewtonJointUserData(joint)));
+		// HPL1Engine: SetUserData takes a non-const reference; GCC won't bind a temporary to it.
+		ndSharedPtr<ndJointUserData> newUserData(new NewtonJointUserData(joint));
+		joint->SetUserData(newUserData);
 		userData = joint->GetUserData();
 	}
 	NewtonJointUserData* const jointUserData = PointerCast<NewtonJointUserData, ndJointUserData>(**userData);

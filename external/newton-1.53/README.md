@@ -28,4 +28,10 @@ marked with an `// HPL1Engine:` comment and logged in PenumbraOverture's
 Where Newton 4 defaults and real 1.53 behaviour disagree, we choose 1.53
 behaviour, to keep the game's physics feel.
 
-1. (none yet)
+1. GCC portability (no behaviour change):
+   - `NewtonUtils.h`: `_finite`/`_isnan` (MSVC-only) replaced with
+     `std::isfinite`/`std::isnan` (only compiled when `_DEBUG` is defined).
+   - `NewtonVehicle.cpp`: removed an extra class qualifier on
+     `PostTransformUpdate` inside the class body.
+   - `joints/NewtonJoints.cpp`: the new joint user data is put in a local
+     before `SetUserData`, which takes a non-const reference.

@@ -76,7 +76,8 @@ class NewtonVehicleNotify: public ndModelNotify
 		return false;
 	}
 
-	void NewtonVehicleNotify::PostTransformUpdate(ndFloat32 timestep, ndInt32 threadId)
+	// HPL1Engine: removed the extra class qualifier (GCC rejects it inside the class).
+	void PostTransformUpdate(ndFloat32 timestep, ndInt32 threadId)
 	{
 		NewtonConvexCastVehicle* const vehicle = PointerCast<NewtonConvexCastVehicle, ndModel>(GetModel());
 		ndAssert(vehicle);

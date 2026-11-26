@@ -26,7 +26,8 @@ inline bool CheckFloat____(const ndFloat32* ptr, ndInt32 size)
 	#ifdef _DEBUG
 	for (ndInt32 i = 0; i < size; ++i)
 	{
-		if (!_finite(ptr[i]) || _isnan(ptr[i]))
+		// HPL1Engine: _finite/_isnan are MSVC-only; use the standard functions.
+		if (!std::isfinite(ptr[i]) || std::isnan(ptr[i]))
 		{
 			return false;
 		}
