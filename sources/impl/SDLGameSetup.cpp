@@ -37,7 +37,32 @@
 
 #include "SDL/SDL.h"
 
+#include <stdlib.h>
+
 namespace hpl {
+
+	//-----------------------------------------------------------------------
+
+	// HPL1Engine: on systems where SDL 1.2 is really sdl12-compat (most modern
+	// Linux distros), sdl12-compat draws OpenGL games into its own framebuffer
+	// object so it can scale them ("OpenGL scaling"). With anti-aliasing on,
+	// that framebuffer is multisampled, and the engine's direct
+	// glCopyTexSubImage2D calls (every post effect copies the screen this way)
+	// fail on it, so bloom, motion blur and the image trail draw a black
+	// screen. sdl12-compat already turns the scaling off for the retail
+	// Penumbra.exe on Windows; we turn it off for our binary everywhere.
+	// The window is then a real multisampled window, which the copies can
+	// read. A value the player set themselves is left alone.
+	static void DisableSdl12CompatOpenGLScaling()
+	{
+		const char *sVar = "SDL12COMPAT_OPENGL_SCALING";
+		if(getenv(sVar) != NULL) return;
+	#ifdef WIN32
+		_putenv_s(sVar, "0");
+	#else
+		setenv(sVar, "0", 0);
+	#endif
+	}
 
 	//////////////////////////////////////////////////////////////////////////
 	// CONSTRUCTORS
@@ -47,6 +72,9 @@ namespace hpl {
 
 	cSDLGameSetup::cSDLGameSetup()
 	{
+		// Must happen before SDL_Init, which is where sdl12-compat reads it.
+		DisableSdl12CompatOpenGLScaling();
+
 		if (SDL_Init( SDL_INIT_VIDEO | SDL_INIT_TIMER ) < 0) {
 			FatalError("Error Initializing Display: %s",SDL_GetError());
 			exit(1);
