@@ -183,15 +183,25 @@ behaviour, to keep the game's physics feel.
     island, it sweeps without the body's spin, and it does not catch level
     faces from behind (1.53 does). Rebound speeds match 2.36's within 1%;
     1.53's are up to 12% lower at 5 to 20 m/s.
+17. `NewtonConvexCollisionCalculateInertialMatrix` (NewtonCollision.cpp)
+    returns the inertia about the shape's centre of mass, as 1.53 (and as
+    `NewtonBodySetMassMatrix` expects). Newton 4 gives it about the shape's
+    origin, so a collider offset from its body (or a compound) was harder
+    to rotate: 1.85 times about the spin axis for the mine's hatch tool,
+    up to 19 times about other axes. Not copied from 1.53: its inertia is
+    wrong for small shapes (boxes under 0.001 m^3 are divided by 0.001
+    instead of their volume, cylinders under about 7.5 cm radius get
+    unrelated values, a 3 cm sphere gets none). This layer, like 2.36,
+    computes them correctly.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 82 checks covering buffers, shape collision, joint readouts and
+uses it: 84 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
-the world box, NaN guard, spin cap, level meshes and continuous
-collision. It
+the world box, NaN guard, spin cap, level meshes, continuous
+collision and the inertia of offset shapes. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh

@@ -891,6 +891,29 @@ static void TestLevelMesh()
 	NewtonDestroy(w);
 }
 
+// Inertia of a shape offset from its body, as NewtonBodySetMassMatrix
+// takes it: about the shape's centre of mass, so the same as the centred
+// shape's (1.53). Newton 4 alone gave it about the body origin.
+static void TestOffsetInertia()
+{
+	Section("Inertia of offset shapes");
+	NewtonWorld* w = NewtonCreate(NULL, NULL);
+	float offset[16];
+	Translation(offset, -0.041f, 1.211f, -0.098f);
+	NewtonCollision* moved = NewtonCreateBox(w, 0.37f, 0.412f, 0.224f, offset);
+	NewtonCollision* centred = NewtonCreateBox(w, 0.37f, 0.412f, 0.224f, NULL);
+	float i0[3], i1[3], c0[3], c1[3];
+	NewtonConvexCollisionCalculateInertialMatrix(moved, i0, c0);
+	NewtonConvexCollisionCalculateInertialMatrix(centred, i1, c1);
+	bool same = true;
+	for (int k = 0; k < 3; k++) same = same && (std::fabs(i0[k] - i1[k]) < 1e-4f);
+	Check("offset box: inertia about its centre, as when centred", same);
+	Check("...and its centre of mass is the offset", std::fabs(c0[1] - 1.211f) < 1e-4f && std::fabs(c0[0] + 0.041f) < 1e-4f);
+	NewtonReleaseCollision(w, moved);
+	NewtonReleaseCollision(w, centred);
+	NewtonDestroy(w);
+}
+
 // A can fired at things. With continuous collision on for the body and the
 // material pair (HPL1 turns both on), the 1.53 library makes it bounce back
 // off a level wall, a 1 cm thin box and, with a two-part (compound) body, a
@@ -971,6 +994,7 @@ int main()
 	TestSafety();
 	TestLevelMesh();
 	TestContinuousCollision();
+	TestOffsetInertia();
 	printf("\n%d of %d checks passed%s\n", gChecks - gFailures, gChecks, gFailures ? "" : ": all good");
 	return gFailures ? 1 : 0;
 }

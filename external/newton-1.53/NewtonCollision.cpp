@@ -501,12 +501,21 @@ void NewtonConvexCollisionCalculateInertialMatrix(const NewtonCollision* const c
 	ndShapeInstance* const instance = PointerCast<ndShapeInstance, NewtonCollision>(convexCollision);
 	const ndMatrix tmpInertia(instance->CalculateInertia());
 
-	inertia[0] = tmpInertia[0][0];
-	inertia[1] = tmpInertia[1][1];
-	inertia[2] = tmpInertia[2][2];
-	origin[0] = tmpInertia[3][0];
-	origin[1] = tmpInertia[3][1];
-	origin[2] = tmpInertia[3][2];
+	// HPL1Engine: Newton 4 gives the inertia about the shape's origin; 1.53
+	// gave it about the centre of mass it returns in origin, which is what
+	// NewtonBodySetMassMatrix expects. Move it there (parallel axis, per unit
+	// mass). For a shape offset from its body (a collider away from the mesh
+	// origin, or a compound) the inertia was too large: 1.85 times about the
+	// spin axis for the mine's hatch tool, so it turned slower than in 1.53.
+	const ndFloat32 cx = tmpInertia[3][0];
+	const ndFloat32 cy = tmpInertia[3][1];
+	const ndFloat32 cz = tmpInertia[3][2];
+	inertia[0] = tmpInertia[0][0] - (cy * cy + cz * cz);
+	inertia[1] = tmpInertia[1][1] - (cx * cx + cz * cz);
+	inertia[2] = tmpInertia[2][2] - (cx * cx + cy * cy);
+	origin[0] = cx;
+	origin[1] = cy;
+	origin[2] = cz;
 }
 
 // Name: NewtonCreateConvexHull 
