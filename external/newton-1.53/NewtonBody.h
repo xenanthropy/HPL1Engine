@@ -70,6 +70,7 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 		:ndBodyDynamic()
 		,m_freezeSpeed2(ndFloat32(-1.0f))
 		,m_freezeOmega2(ndFloat32(-1.0f))
+		,m_continuousCollision(0)
 	{
 	}
 
@@ -87,6 +88,11 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 
 	ndFloat32 m_freezeSpeed2;
 	ndFloat32 m_freezeOmega2;
+
+	// 1.53's per-body continuous collision flag. Newton 4 has no per-body
+	// switch, so it is only stored and reported back (HPL1 saves it in its
+	// save games and reads it back on load).
+	int m_continuousCollision;
 };
 
 #endif

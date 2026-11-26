@@ -21,6 +21,7 @@
 
 #include "newtonStdafx.h"
 #include "Newton.h"
+#include "NewtonBody.h"
 
 void NewtonSetWorldSize(const NewtonWorld* newtonWorld, const dFloat* minPoint, const dFloat* maxPoint)
 {
@@ -284,7 +285,14 @@ void NewtonBodySetAutoactiveCallback(const NewtonBody* bodyPtr, NewtonBodyActiva
 void NewtonBodySetContinuousCollisionMode(const NewtonBody* body, unsigned state)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
+	// HPL1Engine: remember the flag so the getter reports it back, as 1.53
+	// did. It has no effect on the simulation: Newton 4 has no per-body
+	// switch (and the 1.53 docs above say the feature was disabled anyway).
+	ndNewtonBodyDynamic* const dynBody = dynamic_cast<ndNewtonBodyDynamic*>(PointerCast<ndBody, NewtonBody>(body));
+	if (dynBody)
+	{
+		dynBody->m_continuousCollision = state ? 1 : 0;
+	}
 }
 
 // Name: NewtonBodyGetContinuousCollisionMode 
@@ -306,8 +314,9 @@ void NewtonBodySetContinuousCollisionMode(const NewtonBody* body, unsigned state
 int NewtonBodyGetContinuousCollisionMode(const NewtonBody* bodyPtr)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
-	return 0;
+	// HPL1Engine: report the stored flag (see the setter above).
+	const ndNewtonBodyDynamic* const dynBody = dynamic_cast<const ndNewtonBodyDynamic*>(PointerCast<ndBody, NewtonBody>(bodyPtr));
+	return dynBody ? dynBody->m_continuousCollision : 0;
 }
 
 // Name: NewtonSetBodyLeaveWorldEvent 
