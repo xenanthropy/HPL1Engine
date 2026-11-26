@@ -101,3 +101,17 @@ behaviour, to keep the game's physics feel.
      `NewtonJointSetStiffness` stores the value (default 0.9, as in 1.53)
      so it can be read back; it has no effect on Newton 4.
    - `Newton.h` includes `<stddef.h>` for `size_t`.
+
+## Test
+
+`tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
+uses it: 53 checks covering buffers, shape collision, joint readouts and
+stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
+limit callbacks, materials and contact callbacks, and joint utilities. It
+draws nothing, so it runs the same on any machine. From the build folder:
+
+```sh
+make newton153_test && ./HPL1Engine/external/newton-1.53/newton153_test
+```
+
+Exit code 0 means every check passed; each check prints PASS or FAIL.

@@ -52,3 +52,12 @@ endif()
 # The Newton 4 core runs its update on worker threads.
 find_package(Threads REQUIRED)
 target_link_libraries(newton153 PUBLIC Threads::Threads)
+
+# HPL1Engine: headless test of the layer as HPL1 uses it (tests/). Not part
+# of the normal build; build and run it with
+#     make newton153_test && ./HPL1Engine/external/newton-1.53/newton153_test
+# from the build folder. Exit code 0 = all checks passed.
+add_executable(newton153_test EXCLUDE_FROM_ALL tests/newton153_test.cpp)
+target_link_libraries(newton153_test PRIVATE newton153)
+# Same language level as HPL1, which only sees the plain C header.
+set_target_properties(newton153_test PROPERTIES CXX_STANDARD 11 CXX_STANDARD_REQUIRED ON)
