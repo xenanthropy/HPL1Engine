@@ -560,9 +560,17 @@ void NewtonBodySetMatrix(const NewtonBody* bodyPtr, const dFloat* matrixPtr)
 	ndBody* const body = PointerCast<ndBody, NewtonBody>(bodyPtr);
 	ndMatrix matrix(GetMatrix(matrixPtr));
 
+	// HPL1Engine: 1.53 made the rotation orthonormal here, dropping any
+	// scale: front is normalised, right = front x up (normalised), and
+	// up = right x front (checked against the original 1.53 library).
+	// HPL1 passes scaled matrices (a map node with a scale, such as the
+	// boat's notebook); kept as given, the body and its mesh stayed shrunk.
 	matrix.m_front.m_w = ndFloat32(0.0f);
 	matrix.m_up.m_w = ndFloat32(0.0f);
 	matrix.m_right.m_w = ndFloat32(0.0f);
+	matrix.m_front = matrix.m_front.Normalize();
+	matrix.m_right = matrix.m_front.CrossProduct(matrix.m_up).Normalize();
+	matrix.m_up = matrix.m_right.CrossProduct(matrix.m_front);
 	matrix.m_posit.m_w = ndFloat32(1.0f);
 	body->SetMatrix(matrix);
 }

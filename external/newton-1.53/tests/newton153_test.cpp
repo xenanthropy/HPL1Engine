@@ -294,6 +294,23 @@ static void TestBodies()
 	Check("a body woken every frame keeps swinging with slowly tilting gravity", stopped < 20);
 	NewtonDestroy(w);
 
+	// 1.53's NewtonBodySetMatrix keeps only the rotation: front normalised,
+	// right = front x up, up = right x front. HPL1 passes scaled matrices
+	// for map nodes that carry a scale (the boat's notebook).
+	{
+		w = NewtonCreate(NULL, NULL);
+		NewtonBody* sb = Box(w, 1, 1, 1, 1, 0, 0, 0, NoForce);
+		const float skewed[16] = {2, 0.5f, 0.1f, 0, 0.3f, 3, 0.2f, 0, 0.1f, 0.4f, 0.5f, 0, 1, 2, 3, 1};
+		const float want[16] = {0.9690f, 0.2423f, 0.0485f, 0, -0.2447f, 0.9682f, 0.0529f, 0,
+		                        -0.0341f, -0.0631f, 0.9974f, 0, 1, 2, 3, 1};   // from the 1.53 library
+		NewtonBodySetMatrix(sb, skewed);
+		float got[16]; NewtonBodyGetMatrix(sb, got);
+		float err = 0;
+		for (int i = 0; i < 16; i++) err = std::fmax(err, std::fabs(got[i] - want[i]));
+		Check("NewtonBodySetMatrix drops scale and skew the way 1.53 did", err < 1e-3f);
+		NewtonDestroy(w);
+	}
+
 	w = NewtonCreate(NULL, NULL);
 	NewtonCollision* c = NewtonCreateBox(w, 1, 0.5f, 0.25f, NULL);
 	NewtonBody* b = NewtonCreateBody(w, c);

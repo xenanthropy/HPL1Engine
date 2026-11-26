@@ -134,11 +134,16 @@ behaviour, to keep the game's physics feel.
     rests a body (zeroing its velocity) on the first quiet step, so the boat
     lamp, which the wave gravity wakes every frame, stopped dead whenever
     its slow swing slowed down.
+13. `NewtonBodySetMatrix` (NewtonBody.cpp) makes the rotation orthonormal
+    as 1.53 did: front normalised, right = front x up (normalised), up =
+    right x front, checked against the original library. HPL1 passes scaled
+    matrices for map nodes that carry a scale; kept as given, the boat
+    cabin's notebook was shrunk to a few millimetres.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 68 checks covering buffers, shape collision, joint readouts and
+uses it: 69 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It

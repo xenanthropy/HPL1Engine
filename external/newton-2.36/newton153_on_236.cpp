@@ -421,7 +421,17 @@ int NewtonBodyGetContinuousCollisionMode(const NewtonBody *body) {
 }
 
 void NewtonBodySetMatrix(const NewtonBody *body, const dFloat *matrix) {
+	// 1.53 made the rotation orthonormal, dropping any scale: front is
+	// normalised, right = front x up (normalised), up = right x front
+	// (checked against the original 1.53 library). HPL1 passes scaled
+	// matrices (a map node with a scale, such as the boat's notebook).
 	AlignedMatrix m(matrix);
+	dgMatrix &mat = *(dgMatrix *)m.v;
+	mat.m_front.m_w = mat.m_up.m_w = mat.m_right.m_w = 0.0f;
+	mat.m_front = mat.m_front.Scale(dgRsqrt(mat.m_front % mat.m_front));
+	mat.m_right = mat.m_front * mat.m_up;
+	mat.m_right = mat.m_right.Scale(dgRsqrt(mat.m_right % mat.m_right));
+	mat.m_up = mat.m_right * mat.m_front;
 	N236_NewtonBodySetMatrix(B(body), m.v);
 }
 
