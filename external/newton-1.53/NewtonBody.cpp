@@ -936,7 +936,10 @@ int NewtonBodyGetSleepingState(const NewtonBody* bodyPtr)
 {
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
-	return body->GetSleepState() ? 1 : 0;
+	// HPL1Engine: 1.53 returns 1 = active, 0 = sleeping (see the comment above,
+	// and HPL1's GetEnabled relies on it). Newton 4's GetSleepState() is true
+	// when sleeping, so invert it.
+	return body->GetSleepState() ? 0 : 1;
 }
 
 // Name: NewtonBodyGetAutoFreeze 
