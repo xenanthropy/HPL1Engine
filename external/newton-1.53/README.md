@@ -146,10 +146,17 @@ behaviour, to keep the game's physics feel.
     matrices for map nodes that carry a scale; kept as given, the boat
     cabin's notebook was shrunk to a few millimetres.
 
+14. Push-out of overlapping bodies (`ndContact::JacobianContactDerivative`),
+    measured against the original 1.53 library: no push below 1/128 m of
+    overlap, then 10 * softness (1.0 m/s per metre for the default 0.1)
+    beyond it. Newton 4 started at about 1/512 m and pushed five times as
+    hard (stiffness 50), and the speed stayed on the body, so props popped
+    out of each other and the lamp's rod was thrown out of its beam.
+
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 73 checks covering buffers, shape collision, joint readouts and
+uses it: 75 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap and level meshes. It

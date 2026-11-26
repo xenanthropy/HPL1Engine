@@ -35,6 +35,9 @@ class ndShapeInstance;
 #define D_REST_RELATIVE_VELOCITY		ndFloat32 (1.0e-3f)
 #define D_MAX_DYNAMIC_FRICTION_SPEED	ndFloat32 (0.3f)
 #define D_MAX_PENETRATION_STIFFNESS		ndFloat32 (50.0f)
+// HPL1Engine: Newton 1.53's push-out (see ndContact::JacobianContactDerivative).
+#define D_HPL_PENETRATION_STIFFNESS		ndFloat32 (10.0f)
+#define D_HPL_RESTING_PENETRATION		(ndFloat32 (1.0f / 128.0f) + D_PENETRATION_TOL)
 
 D_MSV_NEWTON_CLASS_ALIGN_32
 class ndContactPoint

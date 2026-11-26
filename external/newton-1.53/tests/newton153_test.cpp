@@ -736,10 +736,11 @@ static void TestSafety()
 }
 
 //-----------------------------------------------------------------------------
-// 10. Level meshes (tree collision), as 1.53/2.x: bodies rest, stack and
-//     slide on a floor made of many faces, and a body that starts partly
-//     buried in level geometry is not shoved sideways (the boat lamp's rod,
-//     whose hook sits inside its ceiling beam).
+// 10. Level meshes (tree collision), as 1.53: bodies rest, stack and
+//     slide on a floor made of many faces, a body that starts partly buried
+//     in level geometry is not shoved sideways (the boat lamp's rod, whose
+//     hook sits inside its ceiling beam), and overlapping bodies are pushed
+//     apart as gently as the 1.53 library does.
 //-----------------------------------------------------------------------------
 
 // Adds a quad (corners in order, front side by the right-hand rule) as two
@@ -828,6 +829,25 @@ static void TestLevelMesh()
 	}
 	Check("bar hooked into a ceiling beam hangs straight (within 2 degrees)", maxTilt < 2);
 	NewtonDestroy(w);
+
+	// How hard a body that starts inside the floor is pushed out, with no
+	// other forces. The 1.53 library: nothing up to 1/128 m of overlap, then
+	// 1 m/s per metre beyond it (0.0122 m/s from 2 cm). Newton 4 alone gave
+	// 0.033 m/s from 7.5 mm and 0.095 m/s from 2 cm, and kept that speed.
+	float pushed[2];
+	const float overlap[2] = {0.0075f, 0.02f};
+	for (int k = 0; k < 2; k++)
+	{
+		w = NewtonCreate(NULL, NULL);
+		BuildLevel(w);
+		NewtonBody* sunk = Box(w, 0.1f, 0.05f, 0.1f, 1, 0.5f, 0.025f - overlap[k], 0.5f, NoForce);
+		NewtonUpdate(w, kStep);
+		NewtonBodyGetVelocity(sunk, v);
+		pushed[k] = v[1];
+		NewtonDestroy(w);
+	}
+	Check("body 7.5 mm inside the floor is not pushed out", std::fabs(pushed[0]) < 0.001f);
+	Check("body 2 cm inside the floor is pushed out at about 0.012 m/s", pushed[1] > 0.009f && pushed[1] < 0.015f);
 }
 
 int main()

@@ -263,7 +263,12 @@ void ndContact::JacobianContactDerivative(ndConstraintDescritor& desc, const ndC
 	const ndFloat32 restitutionCoefficient = contact.m_material.m_restitution;
 
 	ndFloat32 relSpeed = -(normalJacobian0.m_linear * veloc0 + normalJacobian0.m_angular * omega0 + normalJacobian1.m_linear * veloc1 + normalJacobian1.m_angular * omega1).AddHorizontal().GetScalar();
-	ndFloat32 penetration = ndClamp(contact.m_penetration - D_RESTING_CONTACT_PENETRATION, ndFloat32(0.0f), ndFloat32(0.5f));
+	// HPL1Engine: push overlapping bodies apart the way Newton 1.53 did.
+	// Measured against the 1.53 library: no push below 1/128 m of
+	// overlap, then 10 * softness (1.0 for the default 0.1) metres per
+	// second per metre beyond it. Newton 4 starts at about 1/512 m and
+	// pushes five times harder, which threw props out of each other.
+	ndFloat32 penetration = ndClamp(contact.m_penetration - D_HPL_RESTING_PENETRATION, ndFloat32(0.0f), ndFloat32(0.5f));
 	desc.m_jointSpeed[normalIndex] = ndFloat32 (0.0f);
 	desc.m_positError[normalIndex] = ndFloat32(0.0f);
 	desc.m_speedError[normalIndex] = ndFloat32(0.0f);
@@ -274,9 +279,8 @@ void ndContact::JacobianContactDerivative(ndConstraintDescritor& desc, const ndC
 	desc.m_forceBounds[normalIndex].m_jointForce = (ndForceImpactPair*)&contact.m_normal_Force;
 
 	const ndFloat32 restitutionVelocity = (relSpeed > D_REST_RELATIVE_VELOCITY) ? relSpeed * restitutionCoefficient : ndFloat32(0.0f);
-	const ndFloat32 penetrationStiffness = D_MAX_PENETRATION_STIFFNESS * contact.m_material.m_softness;
+	const ndFloat32 penetrationStiffness = D_HPL_PENETRATION_STIFFNESS * contact.m_material.m_softness;
 	const ndFloat32 penetrationVeloc = penetration * penetrationStiffness;
-	ndAssert(ndAbs(penetrationVeloc - D_MAX_PENETRATION_STIFFNESS * contact.m_material.m_softness * penetration) < ndFloat32(1.0e-6f));
 	desc.m_penetrationStiffness[normalIndex] = penetrationStiffness;
 
 	desc.m_diagonalRegularizer[normalIndex] = ndMax(D_DIAGONAL_REGULARIZER, contact.m_material.m_skinMargin);
