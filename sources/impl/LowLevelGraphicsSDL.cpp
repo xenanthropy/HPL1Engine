@@ -221,15 +221,16 @@ namespace hpl {
 			SetWindowCaption(asWindowCaption);
 		}
 
-		Log(" Init Glee...");
-		if(GLeeInit())
+		Log(" Init GLEW...");
+		GLenum lGlewErr = glewInit();
+		if(lGlewErr == GLEW_OK)
 		{
-			Log("OK\n");
+			Log("OK (GLEW %s)\n", (const char*)glewGetString(GLEW_VERSION));
 		}
 		else
 		{
 			Log("ERROR!\n");
-			Error(" Couldn't init glee!\n");
+			Error(" Couldn't init GLEW: %s\n", (const char*)glewGetErrorString(lGlewErr));
 		}
 
 		///Setup up windows specifc context:
