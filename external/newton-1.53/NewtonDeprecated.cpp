@@ -84,6 +84,39 @@ void NewtonJointSetStiffness(const NewtonJoint* const jointPtr, dFloat stiffness
 	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
 }
 
+// HPL1Engine: the four "Calculate Stop" helpers below were stubs returning 0.
+// HPL1 builds its door, lever, drawer and screw limits on them, so they now
+// return exactly what 1.53 did (formulas from 2.36's dgHingeConstraint,
+// dgSlidingConstraint and dgCorkscrewConstraint, the closest open source):
+// the acceleration that pushes the joint back to the stop value, plus enough
+// to cancel the speed it is moving away with. "position" and "speed" are the
+// joint's current angle/omega or posit/veloc. lowerScale is 1, except the
+// hinge, which in 1.53 multiplies the error below the stop by
+// MIN_JOINT_PIN_LENGTH (16).
+static dFloat HPL1CalculateStop(dFloat position, dFloat speed, dFloat stop, dFloat timestep, dFloat lowerScale)
+{
+	dFloat accel = dFloat(0.0f);
+	if (position > stop)
+	{
+		if (speed < dFloat(0.0f))
+		{
+			speed = dFloat(0.0f);
+		}
+		const dFloat penetrationErr = stop - position;
+		accel = dFloat(100.0f) * penetrationErr - speed * dFloat(1.01f) / timestep;
+	}
+	else if (position < stop)
+	{
+		if (speed > dFloat(0.0f))
+		{
+			speed = dFloat(0.0f);
+		}
+		const dFloat penetrationErr = lowerScale * (stop - position);
+		accel = dFloat(100.0f) * penetrationErr - speed * dFloat(1.01f) / timestep;
+	}
+	return accel;
+}
+
 // Name: NewtonHingeGetJointForce
 // Calculate the angular acceleration needed to stop the hinge at the desired angle.
 //
@@ -100,10 +133,7 @@ void NewtonJointSetStiffness(const NewtonJoint* const jointPtr, dFloat stiffness
 dFloat NewtonHingeCalculateStopAlpha(const NewtonJoint* joint, const NewtonHingeSliderUpdateDesc* desc, dFloat angle)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
-	ndTrace(("please use the joint limits or motor\n"));
-	ndAssert(0);
-	return ndFloat32(0.0f);
+	return HPL1CalculateStop(NewtonHingeGetJointAngle(joint), NewtonHingeGetJointOmega(joint), angle, desc->m_timestep, dFloat(16.0f));
 }
 
 
@@ -123,10 +153,7 @@ dFloat NewtonHingeCalculateStopAlpha(const NewtonJoint* joint, const NewtonHinge
 dFloat NewtonSliderCalculateStopAccel(const NewtonJoint* joint, const NewtonHingeSliderUpdateDesc* desc, dFloat distance)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
-	ndTrace(("please use the joint limits or motor\n"));
-	ndAssert(0);
-	return ndFloat32(0.0f);
+	return HPL1CalculateStop(NewtonSliderGetJointPosit(joint), NewtonSliderGetJointVeloc(joint), distance, desc->m_timestep, dFloat(1.0f));
 }
 
 // Name: NewtonCorkscrewCalculateStopAlpha
@@ -145,10 +172,7 @@ dFloat NewtonSliderCalculateStopAccel(const NewtonJoint* joint, const NewtonHing
 dFloat NewtonCorkscrewCalculateStopAlpha(const NewtonJoint* joint, const NewtonHingeSliderUpdateDesc* desc, dFloat angle)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
-	ndTrace(("please use the joint limits or motor\n"));
-	ndAssert(0);
-	return ndFloat32(0.0f);
+	return HPL1CalculateStop(NewtonCorkscrewGetJointAngle(joint), NewtonCorkscrewGetJointOmega(joint), angle, desc->m_timestep, dFloat(1.0f));
 }
 
 // Name: NewtonCorkscrewGetJointForce
@@ -167,10 +191,7 @@ dFloat NewtonCorkscrewCalculateStopAlpha(const NewtonJoint* joint, const NewtonH
 dFloat NewtonCorkscrewCalculateStopAccel(const NewtonJoint* joint, const NewtonHingeSliderUpdateDesc* desc, dFloat distance)
 {
 	TRACE_FUNCTION(__FUNCTION__);
-	ndTrace(("deprecated function: %s\n", __FUNCDNAME__));
-	ndTrace(("please use the joint limits or motor\n"));
-	ndAssert(0);
-	return ndFloat32(0.0f);
+	return HPL1CalculateStop(NewtonCorkscrewGetJointPosit(joint), NewtonCorkscrewGetJointVeloc(joint), distance, desc->m_timestep, dFloat(1.0f));
 }
 
 // Name: NewtonUniversalCalculateStopAlpha0
