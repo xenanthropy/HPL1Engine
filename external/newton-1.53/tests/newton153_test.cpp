@@ -979,6 +979,47 @@ static void TestContinuousCollision()
 	Check("with the body's switch off, a can at 20 m/s passes through the wall", FireAt(0, 20, 0, false) > 1.5f);
 }
 
+//-----------------------------------------------------------------------------
+// Ray casts while a map loads
+//-----------------------------------------------------------------------------
+
+// HPL1 builds its AI node graph (cAINodeContainer::Compile) with many ray
+// casts while the map loads, before the first NewtonUpdate. Bodies added
+// since the last update sit in a tree that has not been rebalanced and can be
+// hundreds of levels deep; the ray walk used to overflow its 256-entry stack
+// there and crash (spider caves, level01_12).
+static int gRayHits = 0;
+static float CountRayHits(const NewtonBody*, const float*, int, void*, float) { gRayHits++; return 1; }
+static unsigned RayPrefilterAll(const NewtonBody*, const NewtonCollision*, void*) { return 1; }
+
+static int RayHitsInRow(int count, bool update)
+{
+	NewtonWorld* w = NewtonCreate(NULL, NULL);
+	NewtonCollision* box = NewtonCreateBox(w, 0.2f, 0.2f, 0.2f, NULL);
+	float m[16];
+	for (int i = 0; i < count; i++)
+	{
+		NewtonBody* b = NewtonCreateBody(w, box);
+		Translation(m, 0, 0, i * 0.004f);
+		NewtonBodySetMatrix(b, m);
+	}
+	NewtonReleaseCollision(w, box);
+	if (update) Step(w, 1);
+	const float p0[3] = {0, 0, -1};
+	const float p1[3] = {0, 0, 5};
+	gRayHits = 0;
+	NewtonWorldRayCast(w, p0, p1, CountRayHits, NULL, RayPrefilterAll);
+	NewtonDestroy(w);
+	return gRayHits;
+}
+
+static void TestRayCastBeforeUpdate()
+{
+	Section("Ray casts before the first update");
+	Check("ray through 1000 bodies added this frame hits all of them", RayHitsInRow(1000, false) == 1000);
+	Check("ray through 1000 bodies after an update hits all of them", RayHitsInRow(1000, true) == 1000);
+}
+
 int main()
 {
 	setvbuf(stdout, NULL, _IONBF, 0);
@@ -995,6 +1036,7 @@ int main()
 	TestLevelMesh();
 	TestContinuousCollision();
 	TestOffsetInertia();
+	TestRayCastBeforeUpdate();
 	printf("\n%d of %d checks passed%s\n", gChecks - gFailures, gChecks, gFailures ? "" : ": all good");
 	return gFailures ? 1 : 0;
 }

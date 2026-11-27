@@ -193,15 +193,25 @@ behaviour, to keep the game's physics feel.
     instead of their volume, cylinders under about 7.5 cm radius get
     unrelated values, a 3 cm sphere gets none). This layer, like 2.36,
     computes them correctly.
+18. Ray and shape casts through a deep broadphase tree (`ndScene::RayCast`,
+    `ndScene::ConvexCast`, `ndSceneTraversalStack` in ndScene.h). Bodies
+    added between updates are inserted into the tree one by one, and the
+    tree is only rebalanced in the next update. HPL1 builds its AI node
+    graph with many ray casts while a map loads, before the first update,
+    so the tree can then be hundreds of levels deep. The ray walk kept its
+    stack in fixed 256-entry arrays and wrote past them (crash entering the
+    spider caves, level01_12). The stack now keeps 256 entries inline and
+    moves to the heap when it needs more. No change to what a cast hits.
 
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 84 checks covering buffers, shape collision, joint readouts and
+uses it: 86 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap, level meshes, continuous
-collision and the inertia of offset shapes. It
+collision, the inertia of offset shapes and ray casts before the first
+update. It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh

@@ -30,6 +30,62 @@
 
 #define D_SCENE_MAX_STACK_DEPTH		256
 
+// HPL1Engine: the stack for the best-first walk of the broadphase tree in
+// RayCast and ConvexCast. Bodies added between updates are inserted into the
+// tree one by one and it is only rebalanced in the next update, so while a
+// map loads (HPL1 builds its AI node graph with hundreds of ray casts before
+// the first update) the tree can be far deeper than D_SCENE_MAX_STACK_DEPTH.
+// The fixed 256-entry arrays then overflowed and corrupted the stack. This
+// keeps 256 entries inline, so the usual case does not allocate, and moves to
+// the heap only when it needs more.
+template<class T>
+class ndSceneTraversalStack: public ndClassAlloc
+{
+	public:
+	ndSceneTraversalStack()
+		:ndClassAlloc()
+		,m_heap()
+		,m_data(m_fixed)
+		,m_count(0)
+		,m_capacity(D_SCENE_MAX_STACK_DEPTH)
+	{
+	}
+
+	ndInt32 GetCount() const { return m_count; }
+	T& operator[] (ndInt32 i) { ndAssert(i >= 0 && i < m_count); return m_data[i]; }
+	const T& operator[] (ndInt32 i) const { ndAssert(i >= 0 && i < m_count); return m_data[i]; }
+	T Pop() { ndAssert(m_count > 0); m_count--; return m_data[m_count]; }
+
+	void PushBack(const T& element)
+	{
+		if (m_count == m_capacity)
+		{
+			const ndInt32 capacity = m_capacity * 2;
+			// Resize keeps what the heap array already holds.
+			m_heap.Resize(capacity);
+			m_heap.SetCount(capacity);
+			if (m_data == m_fixed)
+			{
+				ndMemCpy(&m_heap[0], m_fixed, m_count);
+			}
+			m_data = &m_heap[0];
+			m_capacity = capacity;
+		}
+		m_data[m_count] = element;
+		m_count++;
+	}
+
+	private:
+	ndSceneTraversalStack(const ndSceneTraversalStack&) = delete;
+	ndSceneTraversalStack& operator=(const ndSceneTraversalStack&) = delete;
+
+	T m_fixed[D_SCENE_MAX_STACK_DEPTH];
+	ndArray<T> m_heap;
+	T* m_data;
+	ndInt32 m_count;
+	ndInt32 m_capacity;
+};
+
 class ndWorld;
 class ndScene;
 class ndContact;
@@ -132,8 +188,8 @@ class ndScene : public ndThreadPool
 	void ProcessContacts(ndInt32 threadIndex, ndInt32 contactCount, ndContactSolver* const contactSolver);
 
 	ndJointBilateralConstraint* FindBilateralJoint(ndBodyKinematic* const body0, ndBodyKinematic* const body1) const;
-	bool RayCast(ndRayCastNotify& callback, ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH>& stackPool, ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH>& distance, const ndFastRay& ray) const;
-	bool ConvexCast(ndConvexCastNotify& callback, ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH>& stackPool, ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH>& distance, const ndFastRay& ray, const ndShapeInstance& convexShape, const ndMatrix& globalOrigin, const ndVector& globalDest) const;
+	bool RayCast(ndRayCastNotify& callback, ndSceneTraversalStack<const ndBvhNode*>& stackPool, ndSceneTraversalStack<ndFloat32>& distance, const ndFastRay& ray) const;
+	bool ConvexCast(ndConvexCastNotify& callback, ndSceneTraversalStack<const ndBvhNode*>& stackPool, ndSceneTraversalStack<ndFloat32>& distance, const ndFastRay& ray, const ndShapeInstance& convexShape, const ndMatrix& globalOrigin, const ndVector& globalDest) const;
 	bool Collide(ndConvexCastNotify& callback, ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH>& stackPool, ndFixSizeArray<ndInt32, D_SCENE_MAX_STACK_DEPTH> overlaped, const ndVector& boxP0, const ndVector& boxP1, const ndShapeInstance& instance, const ndMatrix& matrix, ndInt32 maxContacts) const;
 
 	// call from sub steps update

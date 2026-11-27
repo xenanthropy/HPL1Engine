@@ -1043,8 +1043,8 @@ bool ndScene::Collide(ndConvexCastNotify& callback, ndFixSizeArray<const ndBvhNo
 
 bool ndScene::ConvexCast(
 	ndConvexCastNotify& callback, 
-	ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH>& stackPool, 
-	ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH>& stackDistance,
+	ndSceneTraversalStack<const ndBvhNode*>& stackPool, 
+	ndSceneTraversalStack<ndFloat32>& stackDistance,
 	const ndFastRay& ray, const ndShapeInstance& convexShape, const ndMatrix& globalOrigin, const ndVector& globalDest) const
 {
 	ndVector boxP0;
@@ -1190,8 +1190,8 @@ bool ndScene::ConvexCast(
 
 bool ndScene::RayCast(
 	ndRayCastNotify& callback, 
-	ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH>& stackPool,
-	ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH>& stackDistance,
+	ndSceneTraversalStack<const ndBvhNode*>& stackPool,
+	ndSceneTraversalStack<ndFloat32>& stackDistance,
 	const ndFastRay& ray) const
 {
 	auto InsertNode = [&stackDistance, &stackPool](const ndBvhNode* const node, ndFloat32 dist)
@@ -1345,8 +1345,9 @@ bool ndScene::RayCast(ndRayCastNotify& callback, const ndVector& globalOrigin, c
 		ndFloat32 dist2 = segment.DotProduct(segment).GetScalar();
 		if (dist2 > ndFloat32(1.0e-8f))
 		{
-			ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH> distance;
-			ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH> stackPool;
+			// HPL1Engine: growable stack, see ndSceneTraversalStack in ndScene.h
+			ndSceneTraversalStack<ndFloat32> distance;
+			ndSceneTraversalStack<const ndBvhNode*> stackPool;
 
 			ndFastRay ray(p0, p1);
 			stackPool.PushBack(m_rootNode);
@@ -1388,8 +1389,9 @@ bool ndScene::ConvexCast(ndConvexCastNotify& callback, const ndShapeInstance& co
 		ndAssert(globalOrigin.TestOrthogonal());
 		convexShape.CalculateAabb(globalOrigin, boxP0, boxP1);
 
-		ndFixSizeArray<ndFloat32, D_SCENE_MAX_STACK_DEPTH> distance;
-		ndFixSizeArray<const ndBvhNode*, D_SCENE_MAX_STACK_DEPTH> stackPool;
+		// HPL1Engine: growable stack, see ndSceneTraversalStack in ndScene.h
+		ndSceneTraversalStack<ndFloat32> distance;
+		ndSceneTraversalStack<const ndBvhNode*> stackPool;
 
 		const ndVector velocB(ndVector::m_zero);
 		const ndVector velocA((globalDest - globalOrigin.m_posit) & ndVector::m_triplexMask);
