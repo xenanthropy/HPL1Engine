@@ -42,6 +42,9 @@ class ndSkeletonContainer
 	D_NEWTON_API ~ndSkeletonContainer();
 	D_NEWTON_API ndInt32 GetId() const;
 	D_NEWTON_API bool SetAutoRegualrization(bool state, ndFloat32 regularizer);
+	// HPL1Engine: turn the positive-definite fallback of auto regularization
+	// (RegularizeLcp) on or off without changing the loop rows' regularizer.
+	void SetLcpRegularizationFallback(bool state) { m_autoRegularization = state; }
 
 	const ndNodeList& GetNodeList() const;
 	ndInt32 FindBoneIndex(const ndBodyKinematic* const body) const;

@@ -203,15 +203,38 @@ behaviour, to keep the game's physics feel.
     spider caves, level01_12). The stack now keeps 256 entries inline and
     moves to the heap when it needs more. No change to what a cast hits.
 
+19. Bodies made static and dynamic again with their joints in place
+    (`NewtonBodySetFullMassMatrix` in NewtonBody.cpp, `ndNewtonWorld::OnInitSkeleton`
+    in newtonWorld.cpp, small additions to `ndWorld.h` and
+    `ndSkeletonContainer.h`), as 1.53. HPL1's stick areas set an attached
+    body's mass to 0 and back; the mine cable in level01_10 is a chain of ten
+    ball-jointed bodies plugged in by either end. Two Newton 4 problems:
+    - Newton 4 groups jointed bodies into skeletons (static bodies are their
+      roots) and only rebuilds them when a joint is added or removed, so after
+      the mass change the chain was solved as if the plugged-in end were still
+      free and the other end couldn't be dragged. The skeletons are now rebuilt
+      whenever a jointed body changes between static and dynamic.
+    - With the end static and the cable lying on the floor against its cone
+      limits, the skeleton's contact and limit rows gave a matrix that isn't
+      positive definite and the solve returned forces of about 1e14 (the whole
+      chain NaN). The layer had switched Newton 4's auto regularization off to
+      keep its own regularizer; its fallback that stiffens the diagonal of only
+      such matrices (`RegularizeLcp`) is now on again, and the regularizer is
+      unchanged. Matrices that pass the test are solved exactly as before (the
+      storage-room crane comparison gives identical numbers).
+    Measured against the original 1.53 library with a copy of the cable: the
+    dragged end keeps within 4 to 6 cm of the hand on 1.53 and 6 to 7 cm here,
+    whichever end is plugged in; before, it stayed put or flew off as NaN.
+
 ## Test
 
 `tests/newton153_test.cpp` is a headless test of the layer as HPL1Engine
-uses it: 86 checks covering buffers, shape collision, joint readouts and
+uses it: 88 checks covering buffers, shape collision, joint readouts and
 stop helpers, sleeping/impulse/freeze, ball cone limits, HPL1-style joint
 limit callbacks, materials and contact callbacks, joint utilities, and
 the world box, NaN guard, spin cap, level meshes, continuous
-collision, the inertia of offset shapes and ray casts before the first
-update. It
+collision, the inertia of offset shapes, ray casts before the first
+update and a chain with one end made static (the mine cable). It
 draws nothing, so it runs the same on any machine. From the build folder:
 
 ```sh

@@ -260,6 +260,13 @@ void ndNewtonWorld::OnInitSkeleton(ndSkeletonContainer* const skeleton) const
 {
 	ndWorld::OnInitSkeleton(skeleton);
 	skeleton->SetAutoRegualrization(false, ndFloat32(2.0f) * D_DEFAULT_REGULARIZER);
+	// HPL1Engine: but keep the fallback that stiffens the diagonal when the
+	// skeleton's contact and limit rows make the matrix not positive definite
+	// (redundant rows). Without it the solve returned forces of 1e14 and the
+	// whole chain went NaN: the mine cable, plugged in by one end and lying on
+	// the floor against its ball joint limits (level01_10). 1.53 has no such
+	// failure. Only matrices that fail the test are changed.
+	skeleton->SetLcpRegularizationFallback(true);
 }
 
 ndMaterial* ndNewtonWorld::GetMaterial(int id0, int id1) const

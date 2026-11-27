@@ -113,6 +113,9 @@ class ndWorld: public ndClassAlloc
 	D_NEWTON_API const ndBodyList& GetParticleList() const;
 	D_NEWTON_API const ndContactArray& GetContactList() const;
 	D_NEWTON_API const ndSkeletonList& GetSkeletonList() const;
+	// HPL1Engine: rebuild the skeletons before the next update (a jointed
+	// body changed between static and dynamic).
+	void MarkSkeletonsDirty() { m_skeletonList.m_skelListIsDirty = true; }
 
 	D_NEWTON_API ndInt32 GetSolverIterations() const;
 	D_NEWTON_API void SetSolverIterations(ndInt32 iterations);

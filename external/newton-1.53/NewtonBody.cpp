@@ -605,7 +605,21 @@ void NewtonBodySetFullMassMatrix(const NewtonBody* const bodyPtr, dFloat mass, c
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 	ndMatrix inertia(inertiaMatrix);
+	// HPL1Engine: Newton 4 groups jointed bodies into skeletons, with static
+	// bodies as their roots, and only rebuilds them when a joint is added or
+	// removed. In 1.53 a body could be made static (mass 0) or dynamic again
+	// at any time with its joints in place, and HPL1 does that: a stick area
+	// (the mine cable plugged into a wall, level01_10) sets the attached body's
+	// mass to 0 and back. With the old skeleton the rest of the chain was
+	// solved as if that body were still free: the cable's other end couldn't
+	// be moved, or the chain went NaN. Rebuild the skeletons when that happens.
+	const bool wasStatic = body->GetInvMass() == ndFloat32(0.0f);
 	body->SetMassMatrix(mass, inertia);
+	const bool isStatic = body->GetInvMass() == ndFloat32(0.0f);
+	if ((wasStatic != isStatic) && body->GetJointList().GetCount() && body->GetScene())
+	{
+		body->GetScene()->GetWorld()->MarkSkeletonsDirty();
+	}
 }
 
 // Name: NewtonBodySetMassMatrix 
