@@ -605,19 +605,82 @@ void NewtonBodySetFullMassMatrix(const NewtonBody* const bodyPtr, dFloat mass, c
 	TRACE_FUNCTION(__FUNCTION__);
 	ndBodyKinematic* const body = PointerCast<ndBody, NewtonBody>(bodyPtr)->GetAsBodyKinematic();
 	ndMatrix inertia(inertiaMatrix);
-	// HPL1Engine: Newton 4 groups jointed bodies into skeletons, with static
-	// bodies as their roots, and only rebuilds them when a joint is added or
-	// removed. In 1.53 a body could be made static (mass 0) or dynamic again
-	// at any time with its joints in place, and HPL1 does that: a stick area
-	// (the mine cable plugged into a wall, level01_10) sets the attached body's
-	// mass to 0 and back. With the old skeleton the rest of the chain was
-	// solved as if that body were still free: the cable's other end couldn't
-	// be moved, or the chain went NaN. Rebuild the skeletons when that happens.
+	// HPL1Engine: HPL1 makes a jointed body static (mass 0) and dynamic again
+	// at run time: a stick area holding the plugged-in end of the mine cable
+	// (level01_10, ten ball-jointed bodies). Two Newton 4 problems with that:
+	// - It groups jointed bodies into skeletons, rooted at static bodies, and
+	//   only rebuilt them when a joint was added or removed, so the chain was
+	//   still solved as if that body were free. Rebuild them now.
+	// - A skeleton is solved exactly. With a static end and the chain pulled
+	//   taut (both ends plugged in, or the free end dragged further than the
+	//   cable reaches) that has no solution and gave forces of 1e14: the chain
+	//   went NaN and flew off. 1.53 has no skeleton solver; it lets the joints
+	//   give a little (one joint 0.66 m apart with the cable plugged into both
+	//   sockets). So while any body of a jointed group has been made static
+	//   this way, its joints use the iterative solver, which gives way like
+	//   1.53. Bodies that were static when their joints were made (mass 0 in
+	//   the .ent) are not affected, nor is any other jointed group.
 	const bool wasStatic = body->GetInvMass() == ndFloat32(0.0f);
 	body->SetMassMatrix(mass, inertia);
 	const bool isStatic = body->GetInvMass() == ndFloat32(0.0f);
 	if ((wasStatic != isStatic) && body->GetJointList().GetCount() && body->GetScene())
 	{
+		ndNewtonBodyDynamic* const newtonBody = dynamic_cast<ndNewtonBodyDynamic*>(body);
+		if (newtonBody)
+		{
+			newtonBody->m_madeStatic = isStatic;
+		}
+
+		// the group: bodies joined through dynamic bodies or ones made static
+		auto Follow = [](ndBodyKinematic* const other)
+		{
+			if (other->GetInvMass() > ndFloat32(0.0f))
+			{
+				return true;
+			}
+			const ndNewtonBodyDynamic* const dyn = dynamic_cast<const ndNewtonBodyDynamic*>(other);
+			return dyn && dyn->m_madeStatic;
+		};
+		ndArray<ndBodyKinematic*> bodies;
+		ndArray<ndJointBilateralConstraint*> joints;
+		bodies.PushBack(body);
+		bool anyMadeStatic = false;
+		for (ndInt32 i = 0; i < ndInt32(bodies.GetCount()); ++i)
+		{
+			ndBodyKinematic* const current = bodies[i];
+			const ndNewtonBodyDynamic* const dyn = dynamic_cast<const ndNewtonBodyDynamic*>(current);
+			anyMadeStatic = anyMadeStatic || (dyn && dyn->m_madeStatic);
+			for (ndBodyKinematic::ndJointList::ndNode* node = current->GetJointList().GetFirst(); node; node = node->GetNext())
+			{
+				ndJointBilateralConstraint* const joint = node->GetInfo();
+				bool seen = false;
+				for (ndInt32 j = 0; !seen && (j < ndInt32(joints.GetCount())); ++j)
+				{
+					seen = joints[j] == joint;
+				}
+				if (seen)
+				{
+					continue;
+				}
+				joints.PushBack(joint);
+				ndBodyKinematic* const other = (joint->GetBody0() == current) ? joint->GetBody1() : joint->GetBody0();
+				bool known = false;
+				for (ndInt32 j = 0; !known && (j < ndInt32(bodies.GetCount())); ++j)
+				{
+					known = bodies[j] == other;
+				}
+				if (!known && Follow(other))
+				{
+					bodies.PushBack(other);
+				}
+			}
+		}
+		// The layer's joints are all made with Newton 4's default model.
+		const ndJointBilateralSolverModel model = anyMadeStatic ? m_jointIterativeSoft : m_jointkinematicOpenLoop;
+		for (ndInt32 j = 0; j < ndInt32(joints.GetCount()); ++j)
+		{
+			joints[j]->SetSolverModel(model);
+		}
 		body->GetScene()->GetWorld()->MarkSkeletonsDirty();
 	}
 }

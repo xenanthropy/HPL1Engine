@@ -204,11 +204,11 @@ behaviour, to keep the game's physics feel.
     moves to the heap when it needs more. No change to what a cast hits.
 
 19. Bodies made static and dynamic again with their joints in place
-    (`NewtonBodySetFullMassMatrix` in NewtonBody.cpp, `ndNewtonWorld::OnInitSkeleton`
+    (`NewtonBodySetFullMassMatrix` in NewtonBody.cpp and NewtonBody.h, `ndNewtonWorld::OnInitSkeleton`
     in newtonWorld.cpp, small additions to `ndWorld.h` and
     `ndSkeletonContainer.h`), as 1.53. HPL1's stick areas set an attached
     body's mass to 0 and back; the mine cable in level01_10 is a chain of ten
-    ball-jointed bodies plugged in by either end. Two Newton 4 problems:
+    ball-jointed bodies plugged in by either end. Three Newton 4 problems:
     - Newton 4 groups jointed bodies into skeletons (static bodies are their
       roots) and only rebuilds them when a joint is added or removed, so after
       the mass change the chain was solved as if the plugged-in end were still
@@ -222,9 +222,23 @@ behaviour, to keep the game's physics feel.
       such matrices (`RegularizeLcp`) is now on again, and the regularizer is
       unchanged. Matrices that pass the test are solved exactly as before (the
       storage-room crane comparison gives identical numbers).
-    Measured against the original 1.53 library with a copy of the cable: the
-    dragged end keeps within 4 to 6 cm of the hand on 1.53 and 6 to 7 cm here,
-    whichever end is plugged in; before, it stayed put or flew off as NaN.
+    - With one end plugged in and the cable pulled taut between the two
+      sockets (5.7 m apart, 0.8 m above the floor, cable about 6.6 m), the
+      skeleton's exact solve has no solution: it returned forces of about
+      1e14 and the whole cable went NaN and flew off the map, sometimes
+      without the player touching it. 1.53 has no exact chain solver; its
+      joints give a little instead (on the original library one joint opens
+      about 0.66 m with both ends plugged in). So while any body in a jointed
+      group has been made static at runtime (`m_madeStatic` on
+      `ndNewtonBodyDynamic`), the group's joints use Newton 4's iterative
+      solver (`m_jointIterativeSoft`), and go back to the skeleton solver
+      when the body is dynamic again. Bodies static from creation and all
+      other joints keep the skeleton, so nothing else changes.
+    Measured against the original 1.53 library with a copy of the cable in
+    the real map positions (both sockets, the floor, the -15 degree layout):
+    dragging the second end, it keeps within 4 to 5 cm of the hand on 1.53
+    and 3 to 6 cm here, whichever end is plugged in first; before, it stayed
+    put or flew off as NaN.
 
 ## Test
 

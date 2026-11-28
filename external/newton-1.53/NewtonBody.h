@@ -92,6 +92,7 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 		,m_stepCentre(ndVector::m_zero)
 		,m_stepRotation()
 		,m_stepMatrix(ndGetIdentityMatrix())
+		,m_madeStatic(false)
 	{
 	}
 
@@ -163,6 +164,10 @@ class ndNewtonBodyDynamic : public ndBodyDynamic
 	ndVector m_stepCentre;
 	ndQuaternion m_stepRotation;
 	ndMatrix m_stepMatrix;
+
+	// HPL1Engine: given mass 0 after it was created (a stick area holding
+	// it), see NewtonBodySetFullMassMatrix.
+	bool m_madeStatic;
 };
 
 #endif

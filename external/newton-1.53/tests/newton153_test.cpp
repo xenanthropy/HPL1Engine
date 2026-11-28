@@ -1021,14 +1021,17 @@ static void TestRayCastBeforeUpdate()
 }
 
 //-----------------------------------------------------------------------------
-// A chain with one end made static and back (level01_10's mine cable):
-// a stick area sets the plugged-in end's mass to 0 (and back when it is
-// unplugged) with its joints in place; the other end is then dragged by
-// the player's grab. Measured against the original 1.53 library: the
-// dragged end keeps within a few cm of the hand, whichever end is stuck.
+// A chain with its ends made static and back (level01_10's mine cable): a
+// stick area sets the plugged-in end's mass to 0 (and back when unplugged)
+// with its joints in place; the player's grab drags the other end to the
+// other socket. Cable, sockets and floor as in the map. The sockets are
+// 5.74 m apart and 0.78 m up, so with both ends in the cable is pulled taut;
+// the original 1.53 library then lets one joint come apart (0.66 m) and
+// stays put. Measured against it: the dragged end keeps within 7 to 16 cm
+// of the hand, and nothing goes NaN.
 //-----------------------------------------------------------------------------
 
-struct CablePiece { float x, mass, sx, cx; NewtonBody* body; NewtonCollision* shape; bool gravity; float force[3]; };
+struct CablePiece { NewtonBody* body; NewtonCollision* shape; float mass; bool gravity; float force[3], torque[3]; };
 static CablePiece gCable[10];
 static void CableForce(const NewtonBody* b)
 {
@@ -1037,7 +1040,8 @@ static void CableForce(const NewtonBody* b)
 	NewtonBodyGetMassMatrix(b, &m, &ix, &iy, &iz);
 	float f[3] = {p->force[0], p->force[1] + (p->gravity ? -9.8f * m : 0), p->force[2]};
 	NewtonBodySetForce(b, f);
-	p->force[0] = p->force[1] = p->force[2] = 0;
+	NewtonBodySetTorque(b, p->torque);
+	for (int k = 0; k < 3; k++) p->force[k] = p->torque[k] = 0;
 }
 static void CableSetMass(CablePiece& p, float mass)   // cPhysicsBodyNewton::SetMass
 {
@@ -1052,36 +1056,53 @@ static void CableCom(const CablePiece& p, float* out)
 	NewtonBodyGetMatrix(p.body, m); NewtonBodyGetCentreOfMass(p.body, c);
 	for (int k = 0; k < 3; k++) out[k] = m[12+k] + c[0]*m[k] + c[1]*m[4+k] + c[2]*m[8+k];
 }
-// Plugs end *stuck* (0 or 9) in, drags the other end 5.7 m away from it at
-// walking speed; returns the largest hand-to-end distance, or 1e9 for NaN.
-static float DragPinnedCable(int stuck)
+// Plugs end *first* (9 = wall end, 0 = panel end) into its socket, then the
+// other end into the other socket. Returns the largest hand-to-end distance
+// while dragging the second end, or 1e9 if anything went NaN or flew off.
+static float PlugCable(int first)
 {
-	// modern_mine_contact: joint node x, mass, box length and offset
-	static const float def[10][4] = {
-		{-2.841929f,1.0f,0.421010f,-0.197209f}, {-2.386181f,0.3f,0.832581f,0.436391f},
-		{-1.543533f,0.3f,0.958681f,0.507067f}, {-0.546759f,0.3f,1.042920f,0.506975f},
-		{ 0.491805f,0.3f,0.834452f,0.425531f}, { 1.339046f,0.3f,0.723848f,0.370085f},
-		{ 2.072820f,0.3f,0.795435f,0.422829f}, { 2.907819f,0.3f,0.302342f,0.158842f},
-		{ 3.194810f,0.3f,0.333525f,0.207310f}, { 3.735952f,1.0f,0.222620f,-0.046924f}};
+	// modern_mine_contact.dae: joint node x/y, mass, and box colliders (size, offset)
+	struct Box3 { float sx, sy, sz, x, y; };
+	static const struct { float x, y, mass; int n; Box3 box[2]; } def[10] = {
+		{-2.841929f,0.023057f,1.0f,2,{{0.204690f,0.163711f,0.161051f,-0.062977f,-0.008403f},{0.421010f,0.135321f,0.135104f,-0.197209f,-0.008403f}}},
+		{-2.386181f,0.023057f,0.3f,1,{{0.832581f,0.134260f,0.134260f,0.436391f,-0.008403f}}},
+		{-1.543533f,0.023057f,0.3f,1,{{0.958681f,0.134260f,0.134260f,0.507067f,-0.008403f}}},
+		{-0.546759f,0.023057f,0.3f,1,{{1.042920f,0.134260f,0.134260f,0.506975f,-0.008403f}}},
+		{ 0.491805f,0.023057f,0.3f,1,{{0.834452f,0.134260f,0.134260f,0.425531f,-0.008403f}}},
+		{ 1.339046f,0.023057f,0.3f,1,{{0.723848f,0.134260f,0.134260f,0.370085f,-0.014890f}}},
+		{ 2.072820f,0.028061f,0.3f,1,{{0.795435f,0.134260f,0.134260f,0.422829f,-0.001943f}}},
+		{ 2.907819f,0.028061f,0.3f,1,{{0.302342f,0.134260f,0.134260f,0.158842f,0.001778f}}},
+		{ 3.194810f,0.030597f,0.3f,1,{{0.333525f,0.134260f,0.134260f,0.207310f,-0.006928f}}},
+		{ 3.735952f,0.030597f,1.0f,1,{{0.222620f,0.161319f,0.168344f,-0.046924f,-0.006928f}}}};
 	static const float pivot[9] = {-2.370267f,-1.545347f,-0.549014f,0.493305f,1.342005f,2.072112f,2.916368f,3.205579f,3.735988f};
 	static const float cone[9] = {10,20,20,20,20,20,10,10,10}, twist[9] = {20,40,40,40,40,40,20,10,10};
-	const float y = 0.085f, deg = 3.14159265f / 180.0f;
+	const float deg = 3.14159265f / 180.0f;
+	// placed in the map at (-1.66, 0.45, 1.10), turned -15 degrees about y
+	const float ox = -1.657640f, oy = 0.446374f, oz = 1.101476f, ca = std::cos(-15 * deg), sa = std::sin(-15 * deg);
+	auto Place = [&](float lx, float ly, float* out) { out[0] = ox + ca*lx; out[1] = oy + ly; out[2] = oz - sa*lx; };
+	const float socket[2][3] = {{6.264034f, 0.117140f, 0.370560f}, {0.706258f, 0.086749f, -1.048151f}};   // wall, panel
 
 	NewtonWorld* w = NewtonCreate(NULL, NULL);
 	NewtonSetSolverModel(w, 0); NewtonSetFrictionModel(w, 0);
-	Box(w, 60, 1, 60, 0, 0, -0.5f, 0);
+	Box(w, 60, 1, 60, 0, 0, -1.16f, 0);   // floor at y = -0.66
 	for (int i = 0; i < 10; i++)
 	{
 		CablePiece& p = gCable[i];
-		p.x = def[i][0]; p.mass = def[i][1]; p.sx = def[i][2]; p.cx = def[i][3];
-		float off[16]; Translation(off, p.cx, -0.008f, 0);
-		p.shape = NewtonCreateBox(w, p.sx, 0.134f, 0.134f, off);
+		NewtonCollision* parts[2];
+		for (int k = 0; k < def[i].n; k++)
+		{
+			float off[16]; Translation(off, def[i].box[k].x, def[i].box[k].y, 0);
+			parts[k] = NewtonCreateBox(w, def[i].box[k].sx, def[i].box[k].sy, def[i].box[k].sz, off);
+		}
+		p.shape = def[i].n > 1 ? NewtonCreateCompoundCollision(w, def[i].n, parts) : parts[0];
 		p.body = NewtonCreateBody(w, p.shape);
-		float m[16]; Translation(m, p.x, 0.023f + y, 0);
+		float pos[3]; Place(def[i].x, def[i].y, pos);
+		float m[16] = {ca,0,-sa,0, 0,1,0,0, sa,0,ca,0, pos[0],pos[1],pos[2],1};
 		NewtonBodySetMatrix(p.body, m);
 		NewtonBodySetUserData(p.body, &p);
 		NewtonBodySetForceAndTorqueCallback(p.body, CableForce);
-		p.gravity = true; p.force[0] = p.force[1] = p.force[2] = 0;
+		p.mass = def[i].mass; p.gravity = true;
+		for (int k = 0; k < 3; k++) p.force[k] = p.torque[k] = 0;
 		CableSetMass(p, p.mass);
 		const float damp[3] = {0.4f, 0.4f, 0.4f};
 		NewtonBodySetLinearDamping(p.body, 0.4f);
@@ -1091,86 +1112,103 @@ static float DragPinnedCable(int stuck)
 	const float up[3] = {0, 1, 0};
 	for (int i = 0; i < 9; i++)
 	{
-		float pv[3] = {pivot[i], 0.0186f + y, 0};
+		float pv[3]; Place(pivot[i], 0.018577f, pv);
 		NewtonJoint* j = NewtonConstraintCreateBall(w, pv, gCable[i+1].body, gCable[i].body);
 		NewtonJointSetCollisionState(j, 0);
 		NewtonBallSetConeLimits(j, up, cone[i] * deg, twist[i] * deg);
 	}
 
-	int grab = -1; float hand[3], goal[3], prevErr[3]; bool first = true; float worst = 0;
-	auto Grab = [&](int b, float gx, float gy, float gz)
+	float worst = 0;
+	int grab = -1; float hand[3], goal[3], prevErr[3]; bool firstFrame = true;
+	auto Step1 = [&](bool measure)
 	{
+		if (grab >= 0)
+		{
+			CablePiece& p = gCable[grab];
+			// cPlayerState_Grab: PID (p 180, d 40) at most 30 N/kg, times mass * GrabMassMul 2,
+			// and the spin brake (0.9 * omega * mass, never overshooting)
+			float d[3], len = 0; for (int k = 0; k < 3; k++) { d[k] = goal[k] - hand[k]; len += d[k]*d[k]; }
+			len = std::sqrt(len);
+			const float stepLen = 1.5f * kStep;
+			for (int k = 0; k < 3; k++) hand[k] = len > stepLen ? hand[k] + d[k] / len * stepLen : goal[k];
+			float c[3], e[3], f[3], fl = 0; CableCom(p, c);
+			for (int k = 0; k < 3; k++)
+			{
+				e[k] = hand[k] - c[k]; if (firstFrame) prevErr[k] = e[k];
+				f[k] = 180 * e[k] + 40 * (e[k] - prevErr[k]) / kStep; prevErr[k] = e[k]; fl += f[k]*f[k];
+			}
+			firstFrame = false; fl = std::sqrt(fl);
+			for (int k = 0; k < 3; k++) p.force[k] += f[k] * (fl > 30 ? 30 / fl : 1) * p.mass * 2;
+			float om[3], m[16], mm, I[3];
+			NewtonBodyGetOmega(p.body, om); NewtonBodyGetMatrix(p.body, m); NewtonBodyGetMassMatrix(p.body, &mm, &I[0], &I[1], &I[2]);
+			for (int a = 0; a < 3; a++)
+			{
+				const float lw = om[0]*m[a*4] + om[1]*m[a*4+1] + om[2]*m[a*4+2];
+				const float lt = std::fmax(-std::fabs(lw) * I[a] / kStep, std::fmin(std::fabs(lw) * I[a] / kStep, -0.9f * lw * p.mass));
+				for (int k = 0; k < 3; k++) p.torque[k] += lt * m[a*4+k];
+			}
+		}
+		NewtonUpdate(w, kStep);
+		for (int i = 0; i < 10; i++)
+		{
+			float c[3]; CableCom(gCable[i], c);
+			if (!std::isfinite(c[0] + c[1] + c[2]) || Length(c) > 50) worst = 1e9f;
+		}
+		if (measure && grab >= 0 && worst < 1e9f)
+		{
+			float c[3], e[3]; CableCom(gCable[grab], c);
+			for (int k = 0; k < 3; k++) e[k] = c[k] - hand[k];
+			worst = std::fmax(worst, Length(e));
+		}
+	};
+	auto Plug = [&](int b, int s, bool measure)
+	{
+		// lift the end, take it to the socket (the panel from its open side), plug it in
+		const float viaWall[2][3] = {{5.6f, 0.35f, 0.37f}, {6.264f, 0.117f, 0.37f}};
+		const float viaPanel[3][3] = {{1.3f, 0.45f, -1.05f}, {1.2f, 0.09f, -1.05f}, {0.706f, 0.087f, -1.048f}};
+		float way[4][3]; int n = 1;
 		CablePiece& p = gCable[b];
+		CableCom(p, way[0]); way[0][1] = 0.4f;
+		if (s == 0) { for (int i = 0; i < 2; i++) for (int k = 0; k < 3; k++) way[n + i][k] = viaWall[i][k]; n += 2; }
+		else { for (int i = 0; i < 3; i++) for (int k = 0; k < 3; k++) way[n + i][k] = viaPanel[i][k]; n += 3; }
 		p.gravity = false; NewtonBodySetAutoFreeze(p.body, 0);
 		CableSetMass(p, p.mass / 2); CableSetMass(p, p.mass);   // EnterState, UseNormalMass
 		NewtonWorldUnfreezeBody(w, p.body);
-		grab = b; CableCom(p, hand); goal[0] = gx; goal[1] = gy; goal[2] = gz; first = true;
-	};
-	auto Run = [&](int frames, bool measure)
-	{
-		for (int f = 0; f < frames; f++)
+		grab = b; CableCom(p, hand); firstFrame = true;
+		int k = 0; for (int q = 0; q < 3; q++) goal[q] = way[0][q];
+		for (int f = 0; f < 900; f++)
 		{
-			if (grab >= 0)
-			{
-				// cPlayerState_Grab: PID (p 180, d 40) to the hand, at most 30 N/kg, times mass * GrabMassMul 2
-				float d[3], len = 0; for (int k = 0; k < 3; k++) { d[k] = goal[k] - hand[k]; len += d[k]*d[k]; }
-				len = std::sqrt(len);
-				const float stepLen = 1.5f * kStep;
-				for (int k = 0; k < 3; k++) hand[k] = len > stepLen ? hand[k] + d[k] / len * stepLen : goal[k];
-				float c[3], e[3], force[3], fl = 0; CableCom(gCable[grab], c);
-				for (int k = 0; k < 3; k++)
-				{
-					e[k] = hand[k] - c[k]; if (first) prevErr[k] = e[k];
-					force[k] = 180 * e[k] + 40 * (e[k] - prevErr[k]) / kStep; prevErr[k] = e[k]; fl += force[k]*force[k];
-				}
-				first = false; fl = std::sqrt(fl);
-				for (int k = 0; k < 3; k++) gCable[grab].force[k] += force[k] * (fl > 30 ? 30 / fl : 1) * gCable[grab].mass * 2;
-			}
-			NewtonUpdate(w, kStep);
-			for (int i = 0; i < 10; i++)
-			{
-				float c[3]; CableCom(gCable[i], c);
-				if (!std::isfinite(c[0] + c[1] + c[2]) || Length(c) > 50) worst = 1e9f;
-			}
-			if (measure && grab >= 0 && worst < 1e9f)
-			{
-				float c[3], e[3]; CableCom(gCable[grab], c);
-				for (int k = 0; k < 3; k++) e[k] = c[k] - hand[k];
-				worst = std::fmax(worst, Length(e));
-			}
+			if ((k < n - 1) && (hand[0] == way[k][0]) && (hand[1] == way[k][1]) && (hand[2] == way[k][2])) { k++; for (int q = 0; q < 3; q++) goal[q] = way[k][q]; }
+			Step1(measure);
+			float c[3]; CableCom(p, c);
+			if (std::fabs(c[0] - socket[s][0]) < 0.26f && std::fabs(c[1] - socket[s][1]) < 0.25f && std::fabs(c[2] - socket[s][2]) < 0.25f) break;
 		}
+		// cGameStickArea: drop out of the grab, stop it, mass 0, then put it in place
+		p.gravity = true; NewtonBodySetAutoFreeze(p.body, 1); grab = -1;
+		const float zero[3] = {0, 0, 0};
+		NewtonBodySetVelocity(p.body, zero); NewtonBodySetOmega(p.body, zero);
+		p.gravity = false; CableSetMass(p, 0);
+		Step1(false);
+		float c[3], m[16]; NewtonBodyGetCentreOfMass(p.body, c);
+		Translation(m, socket[s][0] - c[0], socket[s][1] - c[1], socket[s][2] - c[2]);
+		NewtonBodySetMatrix(p.body, m);
+		for (int f = 0; f < 240; f++) Step1(false);
 	};
 
-	Run(120, false);
-	// carry the stuck end 0.5 m out and up to its socket, then plug it in
-	const float sx = stuck == 9 ? 4.3f : -3.2f, sy = 0.35f;
-	Grab(stuck, sx, sy, 0);
-	Run(240, false);
-	CablePiece& s = gCable[stuck];
-	s.gravity = true; NewtonBodySetAutoFreeze(s.body, 1); grab = -1;
-	const float zero[3] = {0, 0, 0};
-	NewtonBodySetVelocity(s.body, zero); NewtonBodySetOmega(s.body, zero);
-	s.gravity = false; CableSetMass(s, 0);   // cGameStickArea::Update, pose time 0
-	{
-		float c[3], m[16]; NewtonBodyGetCentreOfMass(s.body, c);
-		Translation(m, sx - c[0], sy - c[1], -c[2]);
-		NewtonBodySetMatrix(s.body, m);
-	}
-	Run(60, false);
-	// drag the other end to the other socket, 5.66 m from the first
-	Grab(9 - stuck, sx + (stuck == 9 ? -4.0f : 4.0f), sy, -4.0f);
-	Run(360, true);
+	for (int f = 0; f < 180; f++) Step1(false);
+	Plug(first, first == 9 ? 0 : 1, false);
+	Plug(9 - first, first == 9 ? 1 : 0, true);
 	NewtonDestroy(w);
 	return worst;
 }
 
 static void TestPinnedChain()
 {
-	Section("Chain with one end made static (stick area)");
-	const float childEnd = DragPinnedCable(9), parentEnd = DragPinnedCable(0);
-	printf("     largest hand-to-end distance: %.3f m (child end stuck), %.3f m (parent end stuck)\n", childEnd, parentEnd);
-	Check("child end stuck: the other end follows the hand (within 0.2 m)", childEnd < 0.2f);
-	Check("parent end stuck: the other end follows the hand, no NaN", parentEnd < 0.2f);
+	Section("Chain with its ends made static (stick areas)");
+	const float wallFirst = PlugCable(9), panelFirst = PlugCable(0);
+	printf("     largest hand-to-end distance: %.3f m (wall end first), %.3f m (panel end first)\n", wallFirst, panelFirst);
+	Check("mine cable, wall end plugged in first: the other end follows the hand, no NaN", wallFirst < 0.3f);
+	Check("mine cable, panel end plugged in first: the other end follows the hand, no NaN", panelFirst < 0.3f);
 }
 
 int main()
