@@ -171,6 +171,7 @@ namespace hpl {
 		void ClearResourceDirs();
 
 		bool SetLanguageFile(const tString &asFile);
+		cLanguageFile* GetLanguageFile(){ return mpLanguageFile;}
 		const tWString& Translate(const tString& asCat, const tString& asName);
 
 		void AddEntity2DLoader(iEntity2DLoader* apLoader);

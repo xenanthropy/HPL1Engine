@@ -64,6 +64,13 @@ namespace hpl {
 
 		const tWString& Translate(const tString& asCat, const tString& asName);
 
+		/**
+		 * Returns the entry, or NULL if it does not exist. Unlike Translate, it
+		 * logs nothing when the entry is missing. Lets the game correct text
+		 * after loading.
+		 */
+		cLanguageEntry* GetEntry(const tString& asCat, const tString& asName);
+
 	private:
 		tLanguageCategoryMap m_mapCategories;
 		tWString mwsEmpty;

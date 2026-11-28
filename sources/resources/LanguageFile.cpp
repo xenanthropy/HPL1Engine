@@ -245,6 +245,19 @@ namespace hpl {
 
 	//-----------------------------------------------------------------------
 
+	cLanguageEntry* cLanguageFile::GetEntry(const tString& asCat, const tString& asName)
+	{
+		tLanguageCategoryMapIt CatIt = m_mapCategories.find(asCat);
+		if(CatIt == m_mapCategories.end()) return NULL;
+
+		tLanguageEntryMapIt EntryIt = CatIt->second->m_mapEntries.find(asName);
+		if(EntryIt == CatIt->second->m_mapEntries.end()) return NULL;
+
+		return EntryIt->second;
+	}
+
+	//-----------------------------------------------------------------------
+
 	//////////////////////////////////////////////////////////////////////////
 	// PRIVATE METHODS
 	//////////////////////////////////////////////////////////////////////////
